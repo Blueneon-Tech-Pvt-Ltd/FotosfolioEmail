@@ -1,58 +1,43 @@
-# --- Build Stage ---
+# --- STAGE 1: Build Stage ---
 FROM node:20-alpine AS builder
-
-# Install build dependencies (if needed for native modules)
-RUN apk add --no-cache python3 make g++
-
 WORKDIR /app
 
-# Copy package files first (better layer caching)
-COPY package*.json ./
+# Install build dependencies
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 
-# Install ALL dependencies (including devDependencies for build)
-RUN npm ci --prefer-offline --no-audit
+# Copy source and build
+COPY . .
+RUN yarn build
 
-# Copy build config files
-COPY tsconfig*.json nest-cli.json ./
+# Remove development dependencies
+RUN yarn install --production --frozen-lockfile
 
-# Copy source code
-COPY src ./src
+# --- STAGE 2: Production Stage ---
+FROM node:20-alpine AS runner
 
-# Build the application
-RUN npm run build && \
-    npm prune --production
-
-# --- Production Stage ---
-FROM node:20-alpine
-
-# Set NODE_ENV
+# Set to production
 ENV NODE_ENV=production
-
 WORKDIR /app
 
-# Create non-root user first (better security practice)
+# Security: Create a non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nestjs -u 1001 -G nodejs
 
-# Copy package files
-COPY --chown=nestjs:nodejs package*.json ./
-
-# Install production dependencies only
-RUN npm ci --only=production --prefer-offline --no-audit && \
-    npm cache clean --force
-
-# Copy built application from builder
+# Copy only compiled code and production modules
+COPY --chown=nestjs:nodejs --from=builder /app/package.json ./package.json
+COPY --chown=nestjs:nodejs --from=builder /app/node_modules ./node_modules
 COPY --chown=nestjs:nodejs --from=builder /app/dist ./dist
 
-# Switch to non-root user
+# Switch to the non-root user
 USER nestjs
 
-# Expose port (use ENV for flexibility)
-EXPOSE 3000
+# Port is 3002 internally, but we won't expose it to the public
+EXPOSE 3002
 
-# Health check - fixed port variable
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"
+# Health check (internal)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3002/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"
 
-# Start application directly with node (no need for npm)
+# Start the application directly with Node (for proper signal handling)
 CMD ["node", "dist/main.js"]
