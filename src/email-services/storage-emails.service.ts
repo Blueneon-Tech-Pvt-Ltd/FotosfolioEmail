@@ -270,7 +270,25 @@ export class StorageEmailsService extends BaseEmailService {
    * Build ADDON_EXPIRY email (legacy)
    */
   async buildAddonExpiry(payload: any): Promise<EmailData> {
-    const contact: AddonExpiryEmailDto = payload.contact;
+    const contact: AddonExpiryEmailDto = payload;
+    
+    // Validate required fields
+    if (!contact.userEmail) {
+      throw new Error('Missing required field: userEmail');
+    }
+    if (contact.addonLimit === undefined || contact.addonLimit === null) {
+      throw new Error('Missing required field: addonLimit');
+    }
+    if (contact.newStorageLimit === undefined || contact.newStorageLimit === null) {
+      throw new Error('Missing required field: newStorageLimit');
+    }
+    if (contact.storageUsed === undefined || contact.storageUsed === null) {
+      throw new Error('Missing required field: storageUsed');
+    }
+    if (!contact.renewLink) {
+      throw new Error('Missing required field: renewLink');
+    }
+    
     const subject = `Your Addon Storage of ${contact.addonLimit} GB Has Expired`;
     const exceedsLimit =
       Number(contact.storageUsed) > Number(contact.newStorageLimit);
@@ -433,6 +451,24 @@ export class StorageEmailsService extends BaseEmailService {
    */
   buildAddonFinalGrace(payload: any): EmailData {
     const contact = payload;
+    
+    // Validate required fields
+    if (!contact.userEmail) {
+      throw new Error('Missing required field: userEmail');
+    }
+    if (contact.graceDaysRemaining === undefined || contact.graceDaysRemaining === null) {
+      throw new Error('Missing required field: graceDaysRemaining');
+    }
+    if (contact.storageUsed === undefined || contact.storageUsed === null) {
+      throw new Error('Missing required field: storageUsed');
+    }
+    if (!contact.renewLink) {
+      throw new Error('Missing required field: renewLink');
+    }
+    if (!contact.deleteLink) {
+      throw new Error('Missing required field: deleteLink');
+    }
+    
    const subject = `Final Reminder: ${contact.graceDaysRemaining} Day${contact.graceDaysRemaining > 1 ? 's' : ''} Remaining Before Data Deletion`;
 
     const html = `

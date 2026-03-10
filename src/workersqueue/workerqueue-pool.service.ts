@@ -150,7 +150,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
       // Send the email
       await this.emailSender.sendEmail(emailData);
       
-      this.logger.log(`✓ Successfully processed ${type} for ${payload.to}`);
+      this.logger.log(`✓ Successfully processed ${type} for ${emailData.to}`);
     } catch (error: any) {
       this.logger.error(
         `Failed to process job ${job.id}: ${error.message}`,

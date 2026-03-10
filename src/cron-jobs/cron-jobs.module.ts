@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { CronJobsService } from './cron-jobs.service';
 import { CronJobsController } from './cron-jobs.controller';
+import { CronJobsService } from './cron-jobs.service';
 import { WorkersModule } from '../workersqueue/workerqueue.module';
 
 @Module({

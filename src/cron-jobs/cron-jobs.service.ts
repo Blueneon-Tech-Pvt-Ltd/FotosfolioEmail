@@ -15,7 +15,7 @@ export class CronJobsService implements OnModuleInit {
     private readonly workerPool: WorkerPoolService,
   ) {
     // Get main backend URL from config
-    this.mainBackendUrl = this.configService.get('MAIN_BACKEND_URL', 'http://localhost:3000/api');
+    this.mainBackendUrl = this.configService.get('MAIN_BACKEND_URL', 'https://prod.fotosfolio.com');
     this.logger.log(`🔗 Main Backend URL: ${this.mainBackendUrl}`);
   }
 
@@ -51,83 +51,43 @@ export class CronJobsService implements OnModuleInit {
     this.logger.log(`[Cron] Starting midnight tasks at ${startTime.toISOString()}`);
 
     const results = {
-      expiredSubscriptions: { success: false, count: 0, message: '' },
-      expiredAddons: { success: false, count: 0, message: '' },
-      gracePeriod: { success: false, count: 0, message: '' },
-      markExpired: { success: false, count: 0, message: '' },
+      expiredSubscriptions: { success: false, message: '' },
+      expiredAddons: { success: false, message: '' },
+      gracePeriod: { success: false, message: '' },
+      markExpired: { success: false, message: '' },
     };
 
     try {
-      // 1. Get expired subscriptions from backend and queue emails
+      // 1. Send expired subscription emails
       try {
-        const data = await this.getBackendData('/cron/subscriptions/expired');
-        await Promise.all(
-          data.map((subscription) =>
-            this.workerPool.addJob(
-              EmailCategory.SUBSCRIPTION,
-              EmailType.SUBSCRIPTION_EXPIRED,
-              {
-                to: subscription.userEmail,
-                userName: subscription.userName,
-                graceDaysRemaining: subscription.graceDays || 3,
-              }
-            )
-          )
-        );
-        results.expiredSubscriptions = { success: true, count: data.length, message: `Queued ${data.length} expired subscription emails` };
+        const result = await this.sendExpiredEmails();
+        results.expiredSubscriptions = result;
       } catch (error: any) {
-        results.expiredSubscriptions = { success: false, count: 0, message: error.message };
+        results.expiredSubscriptions = { success: false, message: error.message };
       }
 
-      // 2. Get expired add-ons from backend and queue emails
+      // 2. Expire addon storages
       try {
-        const data = await this.getBackendData('/cron/storage/expired-addons');
-        await Promise.all(
-          data.map((addon) =>
-            this.workerPool.addJob(
-              EmailCategory.STORAGE,
-              EmailType.ADDON_EXPIRY,
-              {
-                to: addon.userEmail,
-                userName: addon.userName,
-                addOnName: addon.addonName,
-                expiredDate: addon.expiredDate,
-              }
-            )
-          )
-        );
-        results.expiredAddons = { success: true, count: data.length, message: `Queued ${data.length} addon expiry emails` };
+        const result = await this.expireAddonStorages();
+        results.expiredAddons = result;
       } catch (error: any) {
-        results.expiredAddons = { success: false, count: 0, message: error.message };
+        results.expiredAddons = { success: false, message: error.message };
       }
 
-      // 3. Get users in grace period and send final warnings
+      // 3. Send grace period notifications
       try {
-        const data = await this.getBackendData('/cron/storage/grace-period-users');
-        await Promise.all(
-          data.map((user) =>
-            this.workerPool.addJob(
-              EmailCategory.STORAGE,
-              EmailType.ADDON_FINAL_GRACE,
-              {
-                to: user.userEmail,
-                userName: user.userName,
-                daysRemaining: user.daysRemaining,
-              }
-            )
-          )
-        );
-        results.gracePeriod = { success: true, count: data.length, message: `Queued ${data.length} grace period emails` };
+        const result = await this.sendGracePeriodNotifications();
+        results.gracePeriod = result;
       } catch (error: any) {
-        results.gracePeriod = { success: false, count: 0, message: error.message };
+        results.gracePeriod = { success: false, message: error.message };
       }
 
-      // 4. Mark subscriptions as ended (backend updates DB, no emails)
+      // 4. Mark subscriptions as ended
       try {
-        await this.callBackendEndpoint('/cron/subscriptions/mark-ended', 'POST');
-        results.markExpired = { success: true, count: 0, message: 'Marked expired subscriptions as ended' };
+        const result = await this.markExpiredAsEnded();
+        results.markExpired = result;
       } catch (error: any) {
-        results.markExpired = { success: false, count: 0, message: error.message };
+        results.markExpired = { success: false, message: error.message };
       }
 
       const endTime = new Date();
@@ -142,30 +102,16 @@ export class CronJobsService implements OnModuleInit {
   }
 
   /**
-   * Morning Tasks - Get expiring subscriptions and queue reminder emails
+   * Morning Tasks - Send subscription expiration reminders
    */
   async runSubscriptionReminderTasks() {
     this.logger.log('[Cron] Starting subscription reminder tasks');
 
     try {
-      const data = await this.getBackendData('/cron/subscriptions/expiring-soon');
+      const result = await this.sendExpirationEmails();
       
-      await Promise.all(
-        data.map((subscription) =>
-          this.workerPool.addJob(
-            EmailCategory.SUBSCRIPTION,
-            EmailType.SUBSCRIPTION_EXPIRING,
-            {
-              to: subscription.userEmail,
-              userName: subscription.userName,
-              daysRemaining: subscription.daysRemaining || 7,
-            }
-          )
-        )
-      );
-      
-      this.logger.log(`[Cron] ✅ Queued ${data.length} subscription reminder emails`);
-      return { success: true, count: data.length, timestamp: new Date().toISOString() };
+      this.logger.log('[Cron] ✅ Subscription reminder tasks completed');
+      return { success: result.success, timestamp: new Date().toISOString(), data: result };
     } catch (error) {
       this.logger.error('[Cron] ❌ Failed subscription reminder tasks', error.stack || error);
       throw error;
@@ -188,32 +134,32 @@ export class CronJobsService implements OnModuleInit {
     try {
       // 1. Update storage usage tracking
       try {
-        await this.callBackendEndpoint('/cron/storage/update-usage', 'POST');
-        results.storageTracking = { success: true, message: 'Updated storage usage' };
+        const result = await this.setTotalUsage();
+        results.storageTracking = result;
       } catch (error: any) {
         results.storageTracking = { success: false, message: error.message };
       }
 
       // 2. Cleanup expired reservations
       try {
-        await this.callBackendEndpoint('/cron/storage/cleanup-reservations', 'POST');
-        results.cleanupReservations = { success: true, message: 'Cleaned up reservations' };
+        const result = await this.cleanupExpiredReservations();
+        results.cleanupReservations = result;
       } catch (error: any) {
         results.cleanupReservations = { success: false, message: error.message };
       }
 
       // 3. Archive expired projects
       try {
-        await this.callBackendEndpoint('/cron/projects/archive-expired', 'POST');
-        results.archiveProjects = { success: true, message: 'Archived expired projects' };
+        const result = await this.archiveExpired();
+        results.archiveProjects = result;
       } catch (error: any) {
         results.archiveProjects = { success: false, message: error.message };
       }
 
       // 4. Delete expired projects
       try {
-        await this.callBackendEndpoint('/cron/projects/delete-expired', 'POST');
-        results.deleteExpired = { success: true, message: 'Deleted expired projects' };
+        const result = await this.deleteExpired();
+        results.deleteExpired = result;
       } catch (error: any) {
         results.deleteExpired = { success: false, message: error.message };
       }
@@ -223,6 +169,170 @@ export class CronJobsService implements OnModuleInit {
     } catch (error) {
       this.logger.error('[Cron] ❌ Failed nightly tasks', error.stack || error);
       throw error;
+    }
+  }
+
+  /**
+   * Individual Task Methods (for Swagger endpoints)
+   */
+
+  /**
+   * Send expiration emails for subscriptions expiring soon
+   */
+  async sendExpirationEmails() {
+    this.logger.log('[Cron] Sending subscription expiration emails');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/subscription/send-expiration-emails', 'POST');
+      this.logger.log('[Cron] ✅ Subscription expiration emails sent');
+      return { success: true, message: 'Subscription expiration emails sent', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to send expiration emails', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Send expired emails for subscriptions that expired today
+   */
+  async sendExpiredEmails() {
+    this.logger.log('[Cron] Sending expired subscription emails');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/subscription/send-expired-emails', 'POST');
+      this.logger.log('[Cron] ✅ Expired subscription emails sent');
+      return { success: true, message: 'Expired subscription emails sent', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to send expired emails', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Mark expired subscriptions as ended
+   */
+  async markExpiredAsEnded() {
+    this.logger.log('[Cron] Marking expired subscriptions as ended');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/subscription/mark-expired-as-ended', 'POST');
+      this.logger.log('[Cron] ✅ Marked expired subscriptions as ended');
+      return { success: true, message: 'Marked expired subscriptions as ended', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to mark expired subscriptions', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Expire addon storages
+   */
+  async expireAddonStorages() {
+    this.logger.log('[Cron] Expiring addon storages');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/storage/expire-addon-storages', 'POST');
+      this.logger.log('[Cron] ✅ Addon storages expired');
+      return { success: true, message: 'Addon storages expired', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to expire addon storages', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Send grace period notifications
+   */
+  async sendGracePeriodNotifications() {
+    this.logger.log('[Cron] Sending grace period notifications');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/storage/send-grace-period-notifications', 'POST');
+      this.logger.log('[Cron] ✅ Grace period notifications sent');
+      return { success: true, message: 'Grace period notifications sent', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to send grace period notifications', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Set total storage usage
+   */
+  async setTotalUsage() {
+    this.logger.log('[Cron] Setting total storage usage');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/storage/set-total-usage', 'POST');
+      this.logger.log('[Cron] ✅ Total storage usage set');
+      return { success: true, message: 'Total storage usage set', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to set storage usage', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Cleanup expired reservations
+   */
+  async cleanupExpiredReservations() {
+    this.logger.log('[Cron] Cleaning up expired reservations');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/storage/cleanup-expired-reservations', 'POST');
+      this.logger.log('[Cron] ✅ Expired reservations cleaned up');
+      return { success: true, message: 'Expired reservations cleaned up', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to cleanup reservations', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Archive expired projects
+   */
+  async archiveExpired() {
+    this.logger.log('[Cron] Archiving expired projects');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/project/archive-expired', 'POST');
+      this.logger.log('[Cron] ✅ Expired projects archived');
+      return { success: true, message: 'Expired projects archived', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to archive projects', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Delete expired projects
+   */
+  async deleteExpired() {
+    this.logger.log('[Cron] Deleting expired projects');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/project/delete-expired', 'POST');
+      this.logger.log('[Cron] ✅ Expired projects deleted');
+      return { success: true, message: 'Expired projects deleted', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to delete expired projects', error);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Delete expired archived projects
+   */
+  async deleteExpiredArchived() {
+    this.logger.log('[Cron] Deleting expired archived projects');
+    
+    try {
+      const result = await this.callBackendEndpoint('/cron/project/delete-expired-archived', 'POST');
+      this.logger.log('[Cron] ✅ Expired archived projects deleted');
+      return { success: true, message: 'Expired archived projects deleted', data: result };
+    } catch (error: any) {
+      this.logger.error('[Cron] ❌ Failed to delete expired archived projects', error);
+      return { success: false, message: error.message };
     }
   }
 
