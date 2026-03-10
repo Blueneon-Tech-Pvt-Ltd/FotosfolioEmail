@@ -36,8 +36,6 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
       password: this.configService.get('redis.password'),
     };
 
-    const concurrency = parseInt(this.configService.get('WORKER_CONCURRENCY') || '2', 10);
-
     // Create queues and workers for each category
     const categories: EmailCategory[] = [
       EmailCategory.ACCOUNT,
@@ -55,19 +53,13 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
       const queue = new Queue(queueName, { connection });
       this.queues.set(category, queue);
 
-      // Create worker with rate limiting
-      // Resend allows 2 requests/second globally
-      // With 6 queues, we use conservative limits + BullMQ retry for rate limit errors
+      // Create worker - global rate limit of 2 emails/sec enforced in EmailSenderService
       const worker = new Worker(
         queueName,
         async (job: Job) => this.processJob(category, job),
         {
           connection,
-          concurrency: 2, // Process 2 emails at a time per queue
-          limiter: {
-            max: 2,
-            duration: 1000, // 2 jobs per second per queue
-          },
+          concurrency: 1, // 1 at a time per queue, rate limited globally in EmailSenderService
         },
       );
 
@@ -93,7 +85,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
       this.workers.push(worker);
       this.logger.log(
-        `✓ Worker pool created for ${category} (concurrency: ${concurrency})`,
+        `✓ Worker pool created for ${category} (concurrency: 1, global limit: 2/sec)`,
       );
     }
 

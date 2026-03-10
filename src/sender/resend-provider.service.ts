@@ -158,6 +158,7 @@ export class ResendProviderService implements OnModuleInit {
 
   /**
    * Initialize or reinitialize Resend client with appropriate API key
+   * Only creates a new Resend instance when the key actually needs to change
    */
   private async initializeResendClient(): Promise<void> {
     const count = await this.getTodaysEmailCount();
@@ -171,28 +172,39 @@ export class ResendProviderService implements OnModuleInit {
       this.lastResetDate = today;
     }
 
-    // Switch between keys based on daily limit
-    if (this.emailCountToday >= this.dailyLimit) {
-      this.logger.log(`🔄 Switching to API Key 2 (count: ${this.emailCountToday})`);
-      this.resend = new Resend(this.apiKey2);
-      this.from = 'Fotosfolio <no-reply@mail.fotosfolio.com>';
-    } else {
-      this.logger.log(`✅ Using API Key 1 (count: ${this.emailCountToday})`);
-      this.resend = new Resend(this.apiKey1);
-      this.from = 'Fotosfolio <no-reply@fotosfolio.com>';
-    }
+    // Determine which key should be active
+    const shouldUseKey2 = this.emailCountToday >= this.dailyLimit;
+    const currentKey = this.resend ? (this.from.includes('mail.fotosfolio.com') ? 2 : 1) : 0;
+    const targetKey = shouldUseKey2 ? 2 : 1;
 
-    this.logger.log(
-      `✓ Resend initialized with key ${this.emailCountToday >= this.dailyLimit ? '2' : '1'}, from: ${this.from}`,
-    );
+    // Only re-create client if key needs to change
+    if (currentKey !== targetKey) {
+      if (shouldUseKey2) {
+        this.logger.log(`🔄 Switching to API Key 2 (count: ${this.emailCountToday})`);
+        this.resend = new Resend(this.apiKey2);
+        this.from = 'Fotosfolio <no-reply@mail.fotosfolio.com>';
+      } else {
+        this.logger.log(`✅ Using API Key 1 (count: ${this.emailCountToday})`);
+        this.resend = new Resend(this.apiKey1);
+        this.from = 'Fotosfolio <no-reply@fotosfolio.com>';
+      }
+
+      this.logger.log(
+        `✓ Resend initialized with key ${targetKey}, from: ${this.from}`,
+      );
+    }
   }
 
   /**
    * Get current Resend client (with automatic key rotation)
    */
   async getResendClient(): Promise<Resend> {
-    // Refresh client before each batch of sends
-    await this.initializeResendClient();
+    // Only re-check key rotation when cache has expired (every 5 min)
+    // or if client hasn't been initialized yet
+    const now = Date.now();
+    if (!this.resend || now - this.lastApiFetchTime >= this.apiCacheDuration) {
+      await this.initializeResendClient();
+    }
     return this.resend;
   }
 

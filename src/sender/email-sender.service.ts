@@ -7,6 +7,12 @@ import { EmailData } from '../types/email-types';
 export class EmailSenderService {
   private readonly logger = new Logger(EmailSenderService.name);
 
+  // Global rate limiter: max 2 emails per second (Resend API limit)
+  private readonly maxPerSecond = 2;
+  private sendTimestamps: number[] = [];
+  private sendQueue: Array<{ resolve: () => void }> = [];
+  private processing = false;
+
   constructor(private readonly resendProvider: ResendProviderService) {}
 
   /**
@@ -14,6 +20,9 @@ export class EmailSenderService {
    */
   async sendEmail(emailData: EmailData): Promise<void> {
     const { to, subject, html, text } = emailData;
+
+    // Wait for rate limit slot (queued globally across all workers)
+    await this.acquireRateLimitSlot();
 
     try {
       this.logger.log(`📧 Sending ${emailData.type} email to ${to}`);
@@ -63,6 +72,56 @@ export class EmailSenderService {
    */
   private stripHtml(html: string): string {
     return html.replace(/<[^>]+>/g, '').trim();
+  }
+
+  /**
+   * Acquire a rate limit slot before sending.
+   * Uses a queue to serialize access — prevents race conditions where
+   * multiple workers slip through the check simultaneously.
+   * Guarantees max 2 emails per second globally across all 6 workers.
+   */
+  private acquireRateLimitSlot(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.sendQueue.push({ resolve });
+      this.processQueue();
+    });
+  }
+
+  /**
+   * Process the rate limit queue one at a time.
+   * Only one call processes the queue at a time (via `this.processing` flag),
+   * ensuring timestamps are recorded before the next caller is released.
+   */
+  private async processQueue(): Promise<void> {
+    if (this.processing) return;
+    this.processing = true;
+
+    try {
+      while (this.sendQueue.length > 0) {
+        const now = Date.now();
+        // Remove timestamps older than 1 second
+        this.sendTimestamps = this.sendTimestamps.filter(t => now - t < 1000);
+
+        if (this.sendTimestamps.length < this.maxPerSecond) {
+          // Slot available — record timestamp NOW (before releasing) to prevent race conditions
+          this.sendTimestamps.push(Date.now());
+          const next = this.sendQueue.shift();
+          next?.resolve();
+        } else {
+          // Wait until the oldest timestamp expires
+          const waitTime = 1000 - (now - this.sendTimestamps[0]);
+          this.logger.debug(`⏳ Rate limit: waiting ${waitTime}ms (${this.sendTimestamps.length} emails in last second)`);
+          await new Promise(resolve => setTimeout(resolve, Math.max(waitTime, 50)));
+        }
+      }
+    } finally {
+      this.processing = false;
+      // Safety re-check: if items were pushed while we were setting processing=false,
+      // restart the queue processor to avoid stranded items
+      if (this.sendQueue.length > 0) {
+        this.processQueue();
+      }
+    }
   }
 
   /**
