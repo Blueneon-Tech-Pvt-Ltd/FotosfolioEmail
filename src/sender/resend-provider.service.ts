@@ -78,6 +78,14 @@ export class ResendProviderService implements OnModuleInit {
         const emails = response.data.data || [];
         hasMore = response.data.has_more === true;
         
+        // Debug: Check if we're getting unique emails
+        if (pageCount === 0 && emails.length > 0) {
+          this.logger.debug(`First email ID: ${emails[0]?.id}, created: ${emails[0]?.created_at}`);
+        }
+        if (emails.length > 0) {
+          this.logger.debug(`Last email ID on page: ${emails[emails.length - 1]?.id}`);
+        }
+        
         // Filter emails sent today
         const todaysEmails = emails.filter((email: any) => {
           if (!email.created_at) return false;
@@ -99,8 +107,25 @@ export class ResendProviderService implements OnModuleInit {
         }
         
         // Stop if no more today's emails found on this page (optimization)
+        // Since emails are ordered by date (newest first), if we find no emails from today
+        // on a page, all subsequent pages will be older
         if (todaysEmails.length === 0) {
-          this.logger.log('⏹️ No emails from today on this page, stopping');
+          this.logger.log('⏹️ No emails from today on this page, stopping pagination');
+          break;
+        }
+        
+        // If all emails on this page are from today AND we have 100 emails, continue
+        // Otherwise if we got fewer emails from today, we're at the boundary - stop
+        if (emails.length === 100 && todaysEmails.length === emails.length) {
+          // All 100 emails are from today, continue to next page
+          continue;
+        } else if (todaysEmails.length < emails.length) {
+          // Mixed page (today + older), stop here
+          this.logger.log('⏹️ Reached end of today\'s emails (mixed page), stopping pagination');
+          break;
+        } else if (emails.length < 100) {
+          // This is the last page of results
+          this.logger.log('⏹️ Last page of results reached');
           break;
         }
       }

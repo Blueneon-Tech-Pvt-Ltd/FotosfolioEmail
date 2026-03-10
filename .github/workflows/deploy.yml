@@ -50,6 +50,7 @@ jobs:
             docker run -d \
               --name fotosfolio-email \
               --restart unless-stopped \
+              --network live-db-redis_fotosfolio-production-network \
               --env-file /opt/email/.env \
               ${{ secrets.DOCKER_USERNAME }}/fotosfolio-email:latest
             
