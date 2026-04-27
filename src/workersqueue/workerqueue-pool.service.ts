@@ -378,6 +378,14 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.photographerName || payload.requesterName,
           payload.projectId
         );
+      case EmailType.FAVOURITE_ACCESS_REQUEST:
+        return this.projectEmails.buildFavouriteAccessRequestEmail(
+          payload.projectName,
+          payload.requesterEmail,
+          payload.ownerEmail,
+          payload.photographerName,
+          payload.projectId
+        );
       default:
         throw new Error(`Unknown project email type: ${type}`);
     }
