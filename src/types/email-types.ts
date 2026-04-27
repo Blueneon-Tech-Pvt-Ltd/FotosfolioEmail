@@ -25,7 +25,7 @@ export enum EmailType {
   TWO_FACTOR_ENABLED = 'TWO_FACTOR_ENABLED',
   TWO_FACTOR_CODE = 'TWO_FACTOR_CODE',
   CONTACT_FORM = 'CONTACT_FORM',
-  
+
   // Subscription
   SUBSCRIPTION_STARTED = 'SUBSCRIPTION_STARTED',
   SUBSCRIPTION_RENEWED = 'SUBSCRIPTION_RENEWED',
@@ -34,7 +34,7 @@ export enum EmailType {
   SUBSCRIPTION_EXPIRED = 'SUBSCRIPTION_EXPIRED',
   PLAN_UPGRADED = 'PLAN_UPGRADED',
   PLAN_DOWNGRADED = 'PLAN_DOWNGRADED',
-  
+
   // Security
   LOGIN_ALERT = 'LOGIN_ALERT',
   NEW_IP_LOGIN = 'NEW_IP_LOGIN',
@@ -45,21 +45,22 @@ export enum EmailType {
   PASSKEY_DISABLED = 'PASSKEY_DISABLED',
   SECURITY_QUESTION_ENABLED = 'SECURITY_QUESTION_ENABLED',
   SECURITY_QUESTION_DISABLED = 'SECURITY_QUESTION_DISABLED',
-  
+
   // Project
   PROJECT_SHARED = 'PROJECT_SHARED',
   PROJECT_INVITATION = 'PROJECT_INVITATION',
   PROJECT_TRANSFER = 'PROJECT_TRANSFER',
   ACCESS_REQUEST = 'ACCESS_REQUEST',
+  FAVOURITE_ACCESS_REQUEST = 'FAVOURITE_ACCESS_REQUEST',
   GALLERY_SHARED = 'GALLERY_SHARED',
   FOLDER_SHARED = 'FOLDER_SHARED',
-  
+
   // Payment
   PAYMENT_SUCCESS = 'PAYMENT_SUCCESS',
   PAYMENT_FAILED = 'PAYMENT_FAILED',
   PAYMENT_REJECTION = 'PAYMENT_REJECTION',
   REFUND_PROCESSED = 'REFUND_PROCESSED',
-  
+
   // Storage
   STORAGE_WARNING = 'STORAGE_WARNING',
   STORAGE_FULL = 'STORAGE_FULL',
@@ -107,6 +108,7 @@ export enum EmailJobType {
 
   // Project related
   PROJECT_INVITATION = 'project-invitation',
+  FAVOURITE_ACCESS_REQUEST = 'favourite-access-request',
   ACCESS_REQUEST = 'access-request',
   PROJECT_TRANSFER = 'project-transfer',
 
@@ -239,6 +241,14 @@ export interface ProjectInvitationPayload {
   invitationLink: string;
 }
 
+export interface FavouriteAccessRequestPayload {
+  projectName: string;
+  requesterEmail: string;
+  ownerEmail: string;
+  photographerName: string;
+  projectId: string;
+}
+
 export interface AddonExpiryPayload {
   contact: AddonExpiryEmailDto;
 }
@@ -341,7 +351,8 @@ export type EmailJobPayload =
   | PasskeyDisabledPayload
   | SecurityQuestionEnabledPayload
   | SecurityQuestionDisabledPayload
-  | ProjectTransferPayload;
+  | ProjectTransferPayload
+  | FavouriteAccessRequestPayload;
 
 // Email job interface with typed payload
 export interface EmailJob extends BaseEmailJob {

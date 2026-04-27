@@ -4,7 +4,7 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class ProjectEmailsService extends BaseEmailService {
-  
+
   async buildProjectTransferEmail(
     receiverEmail: string,
     receiverName: string,
@@ -148,7 +148,7 @@ The Fotosfolio Team
     photographerName: string,
     projectId: string
   ): Promise<EmailData> {
-      const currentTime = new Date().toLocaleString('en-US', {
+    const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Kathmandu',
       year: 'numeric',
       month: 'long',
@@ -255,16 +255,137 @@ The Fotosfolio Team
         </div>
       </div>
       `,
-   }
+    };
+  }
+
+  async buildFavouriteAccessRequestEmail(
+    projectName: string,
+    requesterEmail: string,
+    ownerEmail: string,
+    photographerName: string,
+    projectId: string
+  ): Promise<EmailData> {
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Kathmandu',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return {
+      to: ownerEmail,
+      subject: `Access Request for Favorites - ${projectName}`,
+      text: `${requesterEmail} has requested access to your favorite list for the project "${projectName}".`,
+      html: `
+      <div style="background-color:#f4f4f7;padding:40px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+        <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 5px 15px rgba(0,0,0,0.05);">
+
+          <!-- Header (logo left, icons right) -->
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="padding:20px 28px 0 28px;">
+            <tr>
+              <td align="left" valign="middle" style="padding-bottom:18px;">
+                <img src="https://cdn.fotosfolio.com/logo3.png" alt="Fotosfolio" width="140" style="display:block; outline:none; text-decoration:none; border:none; -ms-interpolation-mode:bicubic;" />
+              </td>
+              <td align="right" valign="middle" style="padding-bottom:18px;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-block;">
+                  <tr>
+                    <td style="padding:0 6px;">
+                      <a href="https://www.instagram.com/fotosfolio.np/" target="_blank" style="text-decoration:none;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1384/1384063.png" width="20" alt="Instagram" style="display:block; border:none; outline:none; text-decoration:none;" />
+                      </a>
+                    </td>
+                    <td style="padding:0 6px;">
+                      <a href="https://linkedin.com/company/fotosfolio" target="_blank" style="text-decoration:none;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1384/1384014.png" width="20" alt="LinkedIn" style="display:block; border:none; outline:none; text-decoration:none;" />
+                      </a>
+                    </td>
+                    <td style="padding:0 6px;">
+                      <a href="https://www.facebook.com/profile.php?id=61575539292098" target="_blank" style="text-decoration:none;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/1384/1384005.png" width="20" alt="Facebook" style="display:block; border:none; outline:none; text-decoration:none;" />
+                      </a>
+                    </td>
+                    <td style="padding:0 6px;">
+                      <a href="https://whatsapp.com/channel/0029VbBIFPb8kyyIa0ILHs2M" target="_blank" style="text-decoration:none;">
+                        <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" width="20" alt="WhatsApp" style="display:block; border:none; outline:none; text-decoration:none;" />
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Body -->
+          <div style="padding:50px 50px 40px 50px;text-align:center;">
+            <h2 style="color:#8b0000;font-size:18px;font-weight:600;margin:0 0 25px;">
+              Favorites Access Request
+            </h2>
+
+            <p style="font-size:15px;color:#333;margin:0 0 6px;">Hi ${photographerName},</p>
+            <p style="font-size:14px;color:#333;margin:0 0 25px;line-height:1.5;">
+              <a href="mailto:${requesterEmail}" style="color:#b22222;text-decoration:none;">${requesterEmail}</a> has requested access to favourites from the <strong>${projectName}</strong> gallery.
+            </p>
+
+            <!-- Request Details Box -->
+            <div style="border-left:4px solid #b22222;background-color:#fff;border-radius:6px;padding:40px 40px;margin:0 auto 40px auto;text-align:left;max-width:470px;">
+              <p style="margin:0 0 16px;font-size:14px;font-weight:600;color:#333;">Request Details</p>
+
+              <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <tr>
+                  <td style="padding:10px 0;color:#666;">Project:</td>
+                  <td style="padding:10px 0;text-align:right;color:#111;font-weight:600;">${projectName}</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;color:#666;">Requested By:</td>
+                  <td style="padding:10px 0;text-align:right;">
+                    <a href="mailto:${requesterEmail}" style="color:#b22222;text-decoration:none;">${requesterEmail}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:10px 0;color:#666;">Time:</td>
+                  <td style="padding:10px 0;color:#111;text-align:right;">${currentTime}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Button -->
+            <div style="margin-bottom:35px;">
+              <a href="https://fotosfolio.com/dashboard/projects/${projectId}/favorites"
+                target="_blank"
+                style="background-color:#f8d7da;color:#721c24;text-decoration:none;padding:12px 40px;border-radius:25px;font-size:14px;font-weight:600;display:inline-block;">
+                Review Request
+              </a>
+            </div>
+
+            <p style="font-size:12px;color:#777;margin:0;">
+              If you don’t recognize this request, you can safely ignore this email.
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px;font-size:12px;color:#777;">
+            <p style="margin:0;line-height:1.6;">
+              © 2025 Fotosfolio. All rights reserved.<br>
+              <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
+              <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
+              <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>
+            </p>
+          </div>
+
+        </div>
+      </div>
+      `,
+    };
   }
 
   async buildProjectInvitationEmail(
-  projectName: string,
-  photographerName: string,
-  receiverEmail: string,
-  invitationLink: string,
-): Promise<EmailData> {
-  return {
+    projectName: string,
+    photographerName: string,
+    receiverEmail: string,
+    invitationLink: string,
+  ): Promise<EmailData> {
+    return {
       to: receiverEmail,
       subject: `Your Gallery Invitation for "${projectName}" — FotosFolio`,
       text: `${photographerName} has invited you to view their ${projectName} gallery on FotosFolio.`,
@@ -369,7 +490,7 @@ The Fotosfolio Team
       </div>
       `,
     }
- }
+  }
 }
 
 
