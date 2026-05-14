@@ -4,6 +4,9 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class AccountEmailsService extends BaseEmailService {
+  private getCurrentYear(): number {
+    return new Date().getFullYear();
+  }
   
   async buildAccountCreatedEmail(to: string, username: string): Promise<EmailData> {
     console.log(`Sending account created email to ${to}`);
@@ -95,7 +98,7 @@ export class AccountEmailsService extends BaseEmailService {
       </div>
 
       <div style="max-width:600px; margin:0 auto; text-align:center; padding:20px 0; font-size:11px; color:#999;">
-        <p style="margin:5px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+        <p style="margin:5px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
         <p style="margin:5px 0;">
           <a href="https://fotosfolio.com/privacy" style="color:#999; text-decoration:none;">Privacy Policy</a> |
           <a href="https://fotosfolio.com/terms-and-conditions" style="color:#999; text-decoration:none;">Terms of Service</a> |
@@ -190,7 +193,7 @@ export class AccountEmailsService extends BaseEmailService {
             <!-- Footer -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© ${new Date().getFullYear()} Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
@@ -317,10 +320,10 @@ export class AccountEmailsService extends BaseEmailService {
               </td>
             </tr>
 
-            <!-- Footer (same as sendNewIpLoginAlertMail; © 2025 and three links only) -->
+            <!-- Footer (same as sendNewIpLoginAlertMail; current year and three links only) -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
@@ -434,7 +437,7 @@ export class AccountEmailsService extends BaseEmailService {
         <!-- Footer -->
         <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px 10px;font-size:12px;color:#777;">
           <p style="margin:0;line-height:1.6;">
-            © 2025 Fotosfolio. All rights reserved.<br>
+            © ${this.getCurrentYear()} Fotosfolio. All rights reserved.<br>
             <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
             <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
             <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>
@@ -560,7 +563,7 @@ export class AccountEmailsService extends BaseEmailService {
               <tr>
                 <td style="padding:24px; border-top:1px solid #eee; text-align:center;">
                   <p style="font-size:12px; color:#999; margin:0;">
-                    © 2025 Fotosfolio. All rights reserved.<br>
+                    © ${this.getCurrentYear()} Fotosfolio. All rights reserved.<br>
                     <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                     <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
                     <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>
@@ -656,9 +659,8 @@ The Fotosfolio Team`;
                 </p>
 
                 <div style="margin:20px auto;max-width:480px;background-color:#f6fbf7;border:1px solid #d6eadb;border-radius:8px;padding:16px 20px;text-align:left;">
-                  <p style="font-size:13px;font-weight:600;color:#333;margin:0 0 10px 0;">What this means:</p>
-                  <p style="font-size:13px;color:#666;margin:4px 0;">Your account is now verified.</p>
-                  <p style="font-size:13px;color:#666;margin:4px 0;">You can continue using Fotosfolio normally.</p>
+                  <p style="font-size:13px;color:#666;margin:4px 0;">Your verification is complete</p>
+                  <p style="font-size:13px;color:#666;margin:4px 0;">You can now securely access and use all Fotosfolio features without restrictions.</p>
                 </div>
 
                 <div style="margin:18px 0 10px 0;">
@@ -676,7 +678,7 @@ The Fotosfolio Team`;
 
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> &bull;
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> &bull;
@@ -802,7 +804,7 @@ The Fotosfolio Team`;
 
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> &bull;
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> &bull;
@@ -988,7 +990,7 @@ The Fotosfolio Team`;
             <!-- Footer -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
