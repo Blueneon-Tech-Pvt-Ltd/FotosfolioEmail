@@ -1,5 +1,5 @@
 # Email Microservice - Test All Email Types
-# Sends 20 test emails to sushmitashrestha6464@gmail.com
+# Sends test emails to sushmitashrestha6464@gmail.com
 
 $baseUrl = "http://localhost:3002/api/emails/send"
 $testEmail = "sushmitashrestha6464@gmail.com"
@@ -41,6 +41,8 @@ Send-TestEmail -Category "account" -Type "ACCOUNT_CREATED" -Payload @{ to = $tes
 Send-TestEmail -Category "account" -Type "PASSWORD_RESET" -Payload @{ to = $testEmail; username = $testUser; resetLink = "https://fotosfolio.com/reset/abc123" } -Description "Password Reset"
 Send-TestEmail -Category "account" -Type "EMAIL_VERIFICATION" -Payload @{ to = $testEmail; userName = $testUser; otpCode = "123456" } -Description "Email Verification OTP"
 Send-TestEmail -Category "account" -Type "PASSWORD_CHANGED" -Payload @{ to = $testEmail; username = $testUser } -Description "Password Changed"
+Send-TestEmail -Category "account" -Type "KYC_APPROVED" -Payload @{ to = $testEmail; userName = $testUser } -Description "KYC Approved"
+Send-TestEmail -Category "account" -Type "KYC_REJECTED" -Payload @{ to = $testEmail; userName = $testUser; reason = "The uploaded document image is unclear. Please upload a clearer image." } -Description "KYC Rejected"
 Send-TestEmail -Category "account" -Type "TWO_FACTOR_ENABLED" -Payload @{ userEmail = $testEmail; device = "iPhone 14 Pro"; location = "Kathmandu, Nepal"; ipAddress = "192.168.1.100"; datetime = "2026-02-25T10:30:00Z" } -Description "Two-Factor Authentication Enabled"
 
 # SUBSCRIPTION EMAILS

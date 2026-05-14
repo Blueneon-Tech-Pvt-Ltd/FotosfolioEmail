@@ -22,6 +22,8 @@ export enum EmailType {
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
   EMAIL_CHANGED = 'EMAIL_CHANGED',
   ACCOUNT_DELETED = 'ACCOUNT_DELETED',
+  KYC_APPROVED = 'KYC_APPROVED',
+  KYC_REJECTED = 'KYC_REJECTED',
   TWO_FACTOR_ENABLED = 'TWO_FACTOR_ENABLED',
   TWO_FACTOR_CODE = 'TWO_FACTOR_CODE',
   CONTACT_FORM = 'CONTACT_FORM',
@@ -202,6 +204,17 @@ export interface PasswordResetSuccessPayload {
   username: string;
 }
 
+export interface KycApprovedPayload {
+  to: string;
+  userName: string;
+}
+
+export interface KycRejectedPayload {
+  to: string;
+  userName: string;
+  reason?: string;
+}
+
 export interface LoginNotificationPayload {
   to: string;
   userName: string;
@@ -338,6 +351,8 @@ export type EmailJobPayload =
   | SubscriptionExpiredPayload
   | PasswordResetPayload
   | PasswordResetSuccessPayload
+  | KycApprovedPayload
+  | KycRejectedPayload
   | LoginNotificationPayload
   | NewIpLoginPayload
   | GoogleAccountDisconnectedPayload
