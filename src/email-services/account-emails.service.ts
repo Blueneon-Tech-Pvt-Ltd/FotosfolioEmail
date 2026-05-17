@@ -789,7 +789,7 @@ The Fotosfolio Team`;
                 </p>
 
                 <div style="margin:18px 0 10px 0;">
-                  <a href="https://fotosfolio.com/settings"
+                  <a href="https://fotosfolio.com/dashboard/settings/kyc"
                      style="display:inline-block;background-color:#7b0f0f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:25px;font-weight:500;font-size:15px;box-shadow:0 2px 8px rgba(179,32,32,0.15);">
                     Update Your Documents
                   </a>
