@@ -400,7 +400,7 @@ The amount will be credited to your original payment method within 5-10 business
         <!-- Footer -->
         <div style="border-top:1px solid #eee;background-color:#fafafa;text-align:center;padding:15px;font-size:12px;color:#777;">
           <p style="margin:0;line-height:1.6;">
-            © 2025 Fotosfolio. All rights reserved.<br>
+            © ${new Date().getFullYear()} Fotosfolio. All rights reserved.<br>
             <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
             <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
             <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>
@@ -544,7 +544,7 @@ If you need help, our support team is ready to assist you.
         <!-- Footer -->
         <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px 10px;font-size:12px;color:#777;">
           <p style="margin:0;line-height:1.6;">
-            © 2025 Fotosfolio. All rights reserved.<br>
+            © ${new Date().getFullYear()} Fotosfolio. All rights reserved.<br>
             <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
             <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
             <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>

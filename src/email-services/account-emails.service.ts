@@ -4,6 +4,9 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class AccountEmailsService extends BaseEmailService {
+  private getCurrentYear(): number {
+    return new Date().getFullYear();
+  }
   
   async buildAccountCreatedEmail(to: string, username: string): Promise<EmailData> {
     console.log(`Sending account created email to ${to}`);
@@ -95,7 +98,7 @@ export class AccountEmailsService extends BaseEmailService {
       </div>
 
       <div style="max-width:600px; margin:0 auto; text-align:center; padding:20px 0; font-size:11px; color:#999;">
-        <p style="margin:5px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+        <p style="margin:5px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
         <p style="margin:5px 0;">
           <a href="https://fotosfolio.com/privacy" style="color:#999; text-decoration:none;">Privacy Policy</a> |
           <a href="https://fotosfolio.com/terms-and-conditions" style="color:#999; text-decoration:none;">Terms of Service</a> |
@@ -190,7 +193,7 @@ export class AccountEmailsService extends BaseEmailService {
             <!-- Footer -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© ${new Date().getFullYear()} Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
@@ -317,10 +320,10 @@ export class AccountEmailsService extends BaseEmailService {
               </td>
             </tr>
 
-            <!-- Footer (same as sendNewIpLoginAlertMail; © 2025 and three links only) -->
+            <!-- Footer (same as sendNewIpLoginAlertMail; current year and three links only) -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
@@ -434,7 +437,7 @@ export class AccountEmailsService extends BaseEmailService {
         <!-- Footer -->
         <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px 10px;font-size:12px;color:#777;">
           <p style="margin:0;line-height:1.6;">
-            © 2025 Fotosfolio. All rights reserved.<br>
+            © ${this.getCurrentYear()} Fotosfolio. All rights reserved.<br>
             <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
             <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
             <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>
@@ -446,7 +449,7 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
- async buildOtpVerifiedEmail(to: string, userName: string): Promise<EmailData> {
+  async buildOtpVerifiedEmail(to: string, userName: string): Promise<EmailData> {
     console.log(to, userName);
     const subject = 'Email Verification Completed Successfully';
     const text = `Dear ${userName},
@@ -560,7 +563,7 @@ export class AccountEmailsService extends BaseEmailService {
               <tr>
                 <td style="padding:24px; border-top:1px solid #eee; text-align:center;">
                   <p style="font-size:12px; color:#999; margin:0;">
-                    © 2025 Fotosfolio. All rights reserved.<br>
+                    © ${this.getCurrentYear()} Fotosfolio. All rights reserved.<br>
                     <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                     <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
                     <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>
@@ -576,6 +579,249 @@ export class AccountEmailsService extends BaseEmailService {
     </body>
     </html>
     `;
+    return { to, subject, text, html };
+  }
+
+  async buildKycApprovedEmail(to: string, userName: string): Promise<EmailData> {
+    const subject = 'Your KYC Verification Has Been Approved';
+    const text = `Hi ${userName},
+
+Your KYC verification has been approved successfully.
+
+Your account is now verified, and you can continue using Fotosfolio without interruption.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+The Fotosfolio Team`;
+
+    const html = `
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>KYC Approved</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f3f3f3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f3f3f3; padding:28px 0;">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ffffff; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05); overflow:hidden;">
+
+            <tr>
+              <td style="padding:20px 30px; border-bottom:1px solid #f0f0f0;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle" style="vertical-align:middle;">
+                      <img src="https://cdn.fotosfolio.com/logo3.png" alt="Fotosfolio" width="140" style="display:block; object-fit:contain; border:0; outline:none;" />
+                    </td>
+                    <td align="right" valign="middle" style="vertical-align:middle;">
+                      <table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-block;">
+                        <tr>
+                          <td style="padding:0 6px 0 0;">
+                            <a href="https://www.instagram.com/fotosfolio.np/" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384063.png" width="22" height="22" alt="Instagram" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 6px;">
+                            <a href="https://linkedin.com/company/fotosfolio" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384014.png" width="22" height="22" alt="LinkedIn" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 6px;">
+                            <a href="https://www.facebook.com/profile.php?id=61575539292098" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384005.png" width="22" height="22" alt="Facebook" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 0 0 6px;">
+                            <a href="https://whatsapp.com/channel/0029VbBIFPb8kyyIa0ILHs2M" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" width="22" height="22" alt="WhatsApp" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:40px 36px 28px 36px; text-align:center;">
+                <h2 style="font-size:22px;font-weight:600;color:#7b0f0f;margin:6px 0 12px 0;">KYC Verification Approved</h2>
+
+                <p style="font-size:15px;color:#333;margin:6px 0 8px 0;">Hi <strong>${userName}</strong>,</p>
+
+                <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 18px 0;">
+                  Your KYC verification has been approved successfully.
+                </p>
+
+                <div style="margin:20px auto;max-width:480px;background-color:#f6fbf7;border:1px solid #d6eadb;border-radius:8px;padding:16px 20px;text-align:left;">
+                  <p style="font-size:13px;color:#666;margin:4px 0;">Your verification is complete</p>
+                  <p style="font-size:13px;color:#666;margin:4px 0;">You can now securely access and use all Fotosfolio features without restrictions.</p>
+                </div>
+
+                <div style="margin:18px 0 10px 0;">
+                  <a href="https://fotosfolio.com/login"
+                     style="display:inline-block;background-color:#7b0f0f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:25px;font-weight:500;font-size:15px;box-shadow:0 2px 8px rgba(179,32,32,0.15);">
+                    Go to Your Account
+                  </a>
+                </div>
+
+                <p style="font-size:13px;color:#555;line-height:1.6;max-width:520px;margin:20px auto 0 auto;">
+                  If you have any questions or need help, please contact our support team.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
+                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:0;">
+                  <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> &bull;
+                  <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> &bull;
+                  <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    </body>
+    </html>
+    `;
+
+    return { to, subject, text, html };
+  }
+
+  async buildKycRejectedEmail(to: string, userName: string, reason?: string): Promise<EmailData> {
+    const rejectionReason = reason?.trim() || 'The submitted documents could not be verified.';
+    const subject = 'Your KYC Verification Was Rejected';
+    const text = `Hi ${userName},
+
+We reviewed your KYC submission, but we were unable to approve it at this time.
+
+Reason:
+${rejectionReason}
+
+Please update your documents and submit your KYC again.
+
+If you need help, please contact our support team.
+
+Best regards,
+The Fotosfolio Team`;
+
+    const html = `
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>KYC Rejected</title>
+    </head>
+    <body style="margin:0; padding:0; background-color:#f3f3f3; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f3f3f3; padding:28px 0;">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ffffff; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05); overflow:hidden;">
+
+            <tr>
+              <td style="padding:20px 30px; border-bottom:1px solid #f0f0f0;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td align="left" valign="middle" style="vertical-align:middle;">
+                      <img src="https://cdn.fotosfolio.com/logo3.png" alt="Fotosfolio" width="140" style="display:block; object-fit:contain; border:0; outline:none;" />
+                    </td>
+                    <td align="right" valign="middle" style="vertical-align:middle;">
+                      <table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-block;">
+                        <tr>
+                          <td style="padding:0 6px 0 0;">
+                            <a href="https://www.instagram.com/fotosfolio.np/" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384063.png" width="22" height="22" alt="Instagram" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 6px;">
+                            <a href="https://linkedin.com/company/fotosfolio" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384014.png" width="22" height="22" alt="LinkedIn" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 6px;">
+                            <a href="https://www.facebook.com/profile.php?id=61575539292098" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/1384/1384005.png" width="22" height="22" alt="Facebook" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                          <td style="padding:0 0 0 6px;">
+                            <a href="https://whatsapp.com/channel/0029VbBIFPb8kyyIa0ILHs2M" target="_blank" style="text-decoration:none;">
+                              <img src="https://cdn-icons-png.flaticon.com/512/733/733585.png" width="22" height="22" alt="WhatsApp" style="display:block;border:0;outline:none;" />
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:40px 36px 28px 36px; text-align:center;">
+                <h2 style="font-size:22px;font-weight:600;color:#7b0f0f;margin:6px 0 12px 0;">KYC Verification Rejected</h2>
+
+                <p style="font-size:15px;color:#333;margin:6px 0 8px 0;">Hi <strong>${userName}</strong>,</p>
+
+                <p style="font-size:14px;color:#555;line-height:1.6;margin:0 0 18px 0;">
+                  We reviewed your KYC submission, but we were unable to approve it at this time.
+                </p>
+
+                <div style="margin:20px auto;max-width:480px;background-color:#fff8f1;border:1px solid #f2dec2;border-radius:8px;padding:16px 20px;text-align:left;">
+                  <p style="font-size:13px;font-weight:600;color:#333;margin:0 0 10px 0;">Reason for rejection:</p>
+                  <p style="font-size:13px;color:#666;margin:0;line-height:1.6;">${rejectionReason}</p>
+                </div>
+
+                <p style="font-size:13px;color:#555;line-height:1.6;max-width:520px;margin:0 auto 18px auto;">
+                  Please review your information, update the required documents, and submit your KYC again.
+                </p>
+
+                <div style="margin:18px 0 10px 0;">
+                  <a href="https://fotosfolio.com/settings"
+                     style="display:inline-block;background-color:#7b0f0f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:25px;font-weight:500;font-size:15px;box-shadow:0 2px 8px rgba(179,32,32,0.15);">
+                    Update Your Documents
+                  </a>
+                </div>
+
+                <div style="margin-top:20px;max-width:520px;margin-left:auto;margin-right:auto;background-color:#fdf6f6;border:1px solid #f0dcdc;border-radius:8px;padding:12px 14px;text-align:center;color:#7a1217;font-size:13px;line-height:1.5;">
+                  Need help with resubmission? Please
+                  <a href="https://fotosfolio.com/contact-us" style="color:#7b0f0f;text-decoration:none;">contact our support team</a>.
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
+                <p style="font-size:12px; color:#999; margin:8px 0;">&copy; ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:0;">
+                  <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> &bull;
+                  <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> &bull;
+                  <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    </body>
+    </html>
+    `;
+
     return { to, subject, text, html };
   }
 
@@ -744,7 +990,7 @@ export class AccountEmailsService extends BaseEmailService {
             <!-- Footer -->
             <tr>
               <td style="padding:20px 10px; border-top:1px solid #eee; background-color:#fafafa; text-align:center;">
-                <p style="font-size:12px; color:#999; margin:8px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+                <p style="font-size:12px; color:#999; margin:8px 0;">© ${this.getCurrentYear()} Fotosfolio. All rights reserved.</p>
                 <p style="font-size:12px; color:#999; margin:0;">
                   <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
                   <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •

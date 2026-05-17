@@ -128,7 +128,7 @@ The Fotosfolio Team
       </div>
 
       <div style="max-width:600px; margin:0 auto; text-align:center; padding:20px 0; font-size:11px; color:#999;">
-        <p style="margin:5px 0;">© 2025 Fotosfolio. All rights reserved.</p>
+        <p style="margin:5px 0;">© ${new Date().getFullYear()} Fotosfolio. All rights reserved.</p>
         <p style="margin:5px 0;">
           <a href="https://fotosfolio.com/privacy" style="color:#999; text-decoration:none;">Privacy Policy</a> |
           <a href="https://fotosfolio.com/terms-and-conditions" style="color:#999; text-decoration:none;">Terms of Service</a> |
@@ -245,7 +245,7 @@ The Fotosfolio Team
           <!-- Footer (matches sendProjectInvitation style; no Unsubscribe) -->
           <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px;font-size:12px;color:#777;">
             <p style="margin:0;line-height:1.6;">
-              © 2025 Fotosfolio. All rights reserved.<br>
+              © ${new Date().getFullYear()} Fotosfolio. All rights reserved.<br>
               <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
               <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
               <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>
@@ -366,7 +366,7 @@ The Fotosfolio Team
           <!-- Footer -->
           <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px;font-size:12px;color:#777;">
             <p style="margin:0;line-height:1.6;">
-              © 2025 Fotosfolio. All rights reserved.<br>
+              © ${new Date().getFullYear()} Fotosfolio. All rights reserved.<br>
               <a href="https://fotosfolio.com/privacy" style="color:#7b1717;text-decoration:none;margin:0 6px;">Privacy Policy</a> •
               <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717;text-decoration:none;margin:0 6px;">Terms of Service</a> •
               <a href="https://fotosfolio.com/contact-us" style="color:#7b1717;text-decoration:none;margin:0 6px;">Contact Support</a>
@@ -479,7 +479,7 @@ The Fotosfolio Team
           <!-- Footer -->
           <div style="border-top:1px solid #eaeaea;background-color:#fafafa;text-align:center;padding:15px;font-size:12px;color:#777;">
             <p style="margin:0;line-height:1.6;">
-              © 2025 Fotosfolio. All rights reserved.<br>
+              © ${new Date().getFullYear()} Fotosfolio. All rights reserved.<br>
               <a href="https://fotosfolio.com/privacy" style="color:#7b1717; text-decoration:none; margin:0 6px;">Privacy Policy</a> •
               <a href="https://fotosfolio.com/terms-and-conditions" style="color:#7b1717; text-decoration:none; margin:0 6px;">Terms of Service</a> •
               <a href="https://fotosfolio.com/contact-us" style="color:#7b1717; text-decoration:none; margin:0 6px;">Contact Support</a>

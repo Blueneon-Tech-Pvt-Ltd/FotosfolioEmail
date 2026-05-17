@@ -165,6 +165,17 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
         return this.accountEmails.buildOtpEmail(payload.to, payload.userName, payload.otpCode);
       case EmailType.PASSWORD_CHANGED:
         return this.accountEmails.buildPasswordResetSuccessEmail(payload.to, payload.username);
+      case EmailType.KYC_APPROVED:
+        return this.accountEmails.buildKycApprovedEmail(
+          payload.to,
+          payload.userName || payload.username
+        );
+      case EmailType.KYC_REJECTED:
+        return this.accountEmails.buildKycRejectedEmail(
+          payload.to,
+          payload.userName || payload.username,
+          payload.reason
+        );
       case EmailType.EMAIL_CHANGED:
         // Map to OTP verified as a placeholder
         return this.accountEmails.buildOtpVerifiedEmail(payload.to, payload.userName);
