@@ -31,7 +31,7 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
           delay: 2000,
         },
         removeOnComplete: true,
-        removeOnFail: false,
+        removeOnFail: true,
       },
     });
 

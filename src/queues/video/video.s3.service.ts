@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { pipeline } from 'stream/promises';
+import { createWriteStream } from 'node:fs';
+import { join } from 'node:path';
 import { Readable } from 'stream';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -98,6 +101,48 @@ export class VideoS3Service {
     }
 
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * Download the first `bytes` bytes of an S3 object to a temp file using a single
+   * S3 range request. This is the preferred way to feed data to ffmpeg — it avoids
+   * exposing HTTPS URLs to ffmpeg's static binary, which crashes (SIGSEGV) on some
+   * environments when trying to resolve DNS over HTTPS.
+   *
+   * For a 2-second seek at typical video bitrates (up to ~200Mbps), 30MB covers well
+   * over 1 second of data for any real-world file.
+   *
+   * @param key     S3 object key
+   * @param bytes   Number of bytes to fetch from the start of the object (default 30MB)
+   * @param tempDir Directory to write the temp file into
+   * @returns       Absolute path to the written temp file
+   */
+  /**
+   * @param ext  File extension including the dot, e.g. '.mp4'. Used to name the temp file
+   *             so ffmpeg can detect the container format without an explicit -f flag.
+   */
+  async downloadRangeToTempFile(
+    key: string,
+    bytes: number | undefined,
+    tempDir: string,
+    ext: string,
+  ): Promise<string> {
+    const range = bytes ? `bytes=0-${bytes - 1}` : undefined;
+    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: range });
+    const res = await this.client.send(cmd);
+    const body = res.Body as Readable;
+
+    const outPath = join(tempDir, `video_head${ext}`);
+    const ws = createWriteStream(outPath);
+    await pipeline(body, ws);
+
+    if (bytes) {
+      this.logger.log(`Downloaded first ${(bytes / 1024 / 1024).toFixed(0)}MB of ${key} to ${outPath}`);
+    } else {
+      this.logger.log(`Downloaded full file ${key} to ${outPath}`);
+    }
+
+    return outPath;
   }
 
   // Upload a buffer to S3 with retries

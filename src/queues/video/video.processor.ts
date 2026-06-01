@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { VideoProcessJob } from './video.job.interface';
@@ -10,7 +10,7 @@ import { VideoS3Service } from './video.s3.service';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+ffmpeg.setFfmpegPath(ffmpegStatic as string);
 
 @Injectable()
 export class VideoProcessor {
@@ -50,28 +50,74 @@ export class VideoProcessor {
     );
   }
 
+  // 30MB covers ~2 seconds at up to ~200 Mbps — enough for any real-world video format
+  private readonly THUMBNAIL_HEAD_BYTES = 30 * 1024 * 1024;
+
   private async generateThumbnail(job: Job<VideoProcessJob>): Promise<void> {
-    this.logger.log(`Thumbnail step: requesting read URL for ${job.data.key}`);
-    const sourceUrl = await this.getPresignedReadUrl(job.data.key);
+    this.logger.log(`Thumbnail step: downloading first ${this.THUMBNAIL_HEAD_BYTES / 1024 / 1024}MB for ${job.data.key}`);
+
+    // We purposely avoid passing an HTTPS URL to ffmpeg. Static ffmpeg binaries crash
+    // (SIGSEGV) on many Linux environments due to DNS resolution differences between
+    // the static musl/glibc resolver inside ffmpeg and the system resolver used by Node.
+    // Instead, we fetch only the first 30MB via Node's AWS SDK and write to a temp file.
+    // Extract extension from the S3 key so ffmpeg can detect the container format.
+    // e.g. "Original/.../C2632.MP4" → ".MP4"
+    const keyExtMatch = job.data.key.match(/(\.[^./]+)$/);
+    const keyExt = keyExtMatch ? keyExtMatch[1].toLowerCase() : '.mp4';
+
+    const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-thumb-'));
+    let sourcePath: string;
+    try {
+      sourcePath = await this.videoS3Service.downloadRangeToTempFile(
+        job.data.key,
+        this.THUMBNAIL_HEAD_BYTES,
+        tempDir,
+        keyExt,
+      );
+    } catch (err: any) {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      throw new Error(`Failed to download video head for thumbnail: ${err.message}`);
+    }
 
     this.logger.log(`Thumbnail step: capturing frame for ${job.data.key}`);
-    const { buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourceUrl);
+    let thumbnailBuffer: Buffer;
+    let ext: string;
+    let contentType: string;
+    try {
+      ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
+    } catch (err: any) {
+      if (err.message.includes('Invalid data found') || err.message.includes('moov atom not found')) {
+        this.logger.warn(`Thumbnail capture failed with partial file. Retrying with full file for ${job.data.key}`);
+        await rm(sourcePath, { force: true }).catch(() => {});
+        sourcePath = await this.videoS3Service.downloadRangeToTempFile(
+          job.data.key,
+          undefined, // fetch full file
+          tempDir,
+          keyExt,
+        );
+        ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
+      } else {
+        throw err;
+      }
+    } finally {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
 
     this.logger.log(
-      `Thumbnail step: captured ${thumbnailBuffer.length} bytes for ${job.data.key}`,
+      `Thumbnail step: captured ${thumbnailBuffer!.length} bytes for ${job.data.key}`,
     );
 
-    const thumbnailKey = this.deriveThumbnailKey(job.data.key, ext);
+    const thumbnailKey = this.deriveThumbnailKey(job.data.key, ext!);
 
     this.logger.log(`Thumbnail step: uploading ${thumbnailKey}`);
-    await this.videoS3Service.uploadBuffer(thumbnailKey, thumbnailBuffer, contentType);
+    await this.videoS3Service.uploadBuffer(thumbnailKey, thumbnailBuffer!, contentType!);
 
-    if (thumbnailBuffer.length === 0) {
+    if (thumbnailBuffer!.length === 0) {
       this.logger.warn(`Thumbnail generated empty buffer for ${thumbnailKey}`);
     }
 
     this.logger.log(
-      `Thumbnail generated for ${thumbnailKey} (${Math.round(thumbnailBuffer.length / 1024)} KB)`,
+      `Thumbnail generated for ${thumbnailKey} (${Math.round(thumbnailBuffer!.length / 1024)} KB)`,
     );
   }
 
@@ -101,16 +147,9 @@ export class VideoProcessor {
     this.logger.log(`Moov atom extracted for ${moovKey} (${moovBuffer.length} bytes)`);
   }
 
-  private async getPresignedReadUrl(key: string): Promise<string> {
-    return this.videoS3Service.getPresignedReadUrl(key);
-  }
-
-
-
-  private async captureThumbnail(videoPath: string): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
+  private async captureThumbnail(videoPath: string, tempDir: string): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
     this.logger.log('Starting ffmpeg thumbnail capture');
 
-    const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-thumb-'));
     const useWebp = await this.supportsWebp();
     const ext = useWebp ? '.webp' : '.jpg';
     const contentType = useWebp ? 'image/webp' : 'image/jpeg';
@@ -118,44 +157,36 @@ export class VideoProcessor {
 
     this.logger.log(`Thumbnail step: writing ffmpeg output to ${outputPath}`);
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const command = ffmpeg(videoPath)
-          .frames(1)
-          .outputOptions(['-ss 2', '-vf scale=320:-1', '-an', '-sn', '-dn'])
-          .videoCodec(useWebp ? 'libwebp' : 'mjpeg')
-          .format(useWebp ? 'webp' : 'image2')
-          .output(outputPath);
+    await new Promise<void>((resolve, reject) => {
+      const command = ffmpeg(videoPath)
+        .seekInput(2)          // input seek: fast, no HTTPS involved — file is local
+        .frames(1)
+        .outputOptions(['-vf scale=320:-1', '-an', '-sn', '-dn'])
+        .videoCodec(useWebp ? 'libwebp' : 'mjpeg')
+        .format(useWebp ? 'webp' : 'image2')
+        .output(outputPath);
 
-        command.once('end', () => {
-          resolve();
-        });
-
-        const rejectWithError = (error: unknown) => {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        };
-
-        command.once('error', rejectWithError);
-        command.run();
+      command.once('end', resolve);
+      command.once('error', (err: unknown) => {
+        reject(err instanceof Error ? err : new Error(String(err)));
       });
+      command.run();
+    });
 
-      const thumbnailBuffer = await readFile(outputPath);
+    const thumbnailBuffer = await readFile(outputPath);
 
-      this.logger.log(
-        `Finished ffmpeg thumbnail capture with ${thumbnailBuffer.length} bytes at ${outputPath}`,
-      );
+    this.logger.log(
+      `Finished ffmpeg thumbnail capture with ${thumbnailBuffer.length} bytes at ${outputPath}`,
+    );
 
-      return { buffer: thumbnailBuffer, ext, contentType };
-    } finally {
-      await rm(tempDir, { recursive: true, force: true });
-    }
+    return { buffer: thumbnailBuffer, ext, contentType };
   }
 
   private async supportsWebp(): Promise<boolean> {
     if (this.webpSupported !== undefined) return this.webpSupported;
 
     try {
-      const { stdout } = await this.execFileP(ffmpegInstaller.path, ['-encoders']);
+      const { stdout } = await this.execFileP(ffmpegStatic as string, ['-encoders']);
       this.webpSupported = /webp/i.test(stdout);
     } catch (err) {
       this.logger.warn(`Failed to check ffmpeg encoders: ${String(err)}`);
