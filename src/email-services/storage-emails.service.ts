@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseEmailService } from './base-email.service';
 import { EmailData, EmailCategory, EmailType } from '../types/email-types';
-import { AddonExpiryEmailDto } from 'src/cron-jobs/dto/addonexpiry.dto';
+import { AddonExpiryEmailDto } from '../cron-jobs/dto/addonexpiry.dto';
 
 @Injectable()
 export class StorageEmailsService extends BaseEmailService {

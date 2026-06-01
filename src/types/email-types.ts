@@ -1,5 +1,5 @@
-import { AddonExpiryEmailDto } from 'src/cron-jobs/dto/addonexpiry.dto';
-import { ContactDto } from 'src/user/dto/contact.dto';
+import { AddonExpiryEmailDto } from '../cron-jobs/dto/addonexpiry.dto';
+import { ContactDto } from '../user/dto/contact.dto';
 
 // Email Categories - 6 worker queues for microservice
 export enum EmailCategory {
