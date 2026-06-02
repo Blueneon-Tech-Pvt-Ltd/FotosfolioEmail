@@ -43,9 +43,22 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
       throw new Error('Video process queue is not initialized');
     }
 
-    await this.queue.add('video-process', data, {
+    const existingJob = await this.queue.getJob(data.uploadId);
+    if (existingJob) {
+      const state = await existingJob.getState();
+      this.logger.warn(
+        `Video process job already exists for uploadId ${data.uploadId} in state ${state}; key=${existingJob.data.key}`,
+      );
+    }
+
+    const job = await this.queue.add('video-process', data, {
       jobId: data.uploadId,
     });
+
+    const state = await job.getState();
+    this.logger.log(
+      `Video process job queued for ${data.key} (jobId: ${job.id}, state: ${state})`,
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

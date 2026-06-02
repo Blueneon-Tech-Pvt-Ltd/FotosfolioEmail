@@ -45,10 +45,38 @@ export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Video job completed for ${job.data.key}`);
     });
 
+    this.worker.on('drained', () => {
+      this.logger.log('Video process worker drained; no waiting jobs');
+    });
+
+    this.worker.on('error', (error) => {
+      this.logger.error(`Video process worker error: ${error.message}`, error.stack);
+    });
+
     this.worker.on('failed', (job, error) => {
       this.logger.error(
         `Video job failed for ${job?.data.key ?? 'unknown key'}: ${error.message}`,
       );
+    });
+
+    this.worker.on('paused', () => {
+      this.logger.warn('Video process worker paused');
+    });
+
+    this.worker.on('resumed', () => {
+      this.logger.log('Video process worker resumed');
+    });
+
+    this.worker.on('stalled', (jobId) => {
+      this.logger.warn(`Video job stalled (jobId: ${jobId})`);
+    });
+
+    this.worker.on('closed', () => {
+      this.logger.warn('Video process worker closed');
+    });
+
+    this.worker.on('closing', () => {
+      this.logger.warn('Video process worker closing');
     });
 
     this.logger.log('Video process worker initialized');
