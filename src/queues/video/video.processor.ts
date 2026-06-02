@@ -28,19 +28,10 @@ export class VideoProcessor {
       `Starting video job ${job.id ?? 'unknown'} for ${job.data.key} (uploadId: ${job.data.uploadId})`,
     );
 
-    this.logger.log(`Step 1/4: generating thumbnail and extracting moov for ${job.data.key}`);
-    const [thumbnailResult, moovResult] = await Promise.allSettled([
-      this.generateThumbnail(job),
-      this.extractMoov(job),
-    ]);
+    this.logger.log(`Step 1/4: generating thumbnail for ${job.data.key}`);
+    await this.generateThumbnail(job);
 
-    this.logger.log(`Step 2/4: collecting task results for ${job.data.key}`);
-    const thumbnailFailed = this.logSettledResult('thumbnail', job.data.key, thumbnailResult);
-    const moovFailed = this.logSettledResult('moov', job.data.key, moovResult);
-
-    if (thumbnailFailed || moovFailed) {
-      throw new Error(`One or more tasks failed for ${job.data.key}`);
-    }
+    this.logger.log(`Step 2/4: thumbnail generated for ${job.data.key}`);
 
     await job.updateProgress(50);
 
@@ -74,7 +65,10 @@ export class VideoProcessor {
     const keyExt = keyExtMatch ? keyExtMatch[1].toLowerCase() : '.mp4';
 
     const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-thumb-'));
-    let sourcePath: string;
+    let sourcePath: string | undefined;
+    let thumbnailBuffer: Buffer;
+    let ext: string;
+    let contentType: string;
     try {
       sourcePath = await this.videoS3Service.downloadRangeToTempFile(
         job.data.key,
@@ -83,29 +77,38 @@ export class VideoProcessor {
         keyExt,
       );
     } catch (err: any) {
-      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
-      throw new Error(`Failed to download video head for thumbnail: ${err.message}`);
+      this.logger.warn(
+        `Failed to download video head for thumbnail for ${job.data.key}: ${this.formatError(err)}. Uploading fallback thumbnail.`,
+      );
+      ({ buffer: thumbnailBuffer, ext, contentType } = await this.createFallbackThumbnail(tempDir));
     }
 
-    this.logger.log(`Thumbnail step: capturing frame for ${job.data.key}`);
-    let thumbnailBuffer: Buffer;
-    let ext: string;
-    let contentType: string;
     try {
-      ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
-    } catch (err: any) {
-      if (err.message.includes('Invalid data found') || err.message.includes('moov atom not found')) {
-        this.logger.warn(`Thumbnail capture failed with partial file. Retrying with full file for ${job.data.key}`);
-        await rm(sourcePath, { force: true }).catch(() => {});
-        sourcePath = await this.videoS3Service.downloadRangeToTempFile(
-          job.data.key,
-          undefined, // fetch full file
-          tempDir,
-          keyExt,
-        );
-        ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
-      } else {
-        throw err;
+      if (sourcePath) {
+        this.logger.log(`Thumbnail step: capturing frame for ${job.data.key}`);
+        try {
+          ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
+        } catch (err: any) {
+          this.logger.warn(
+            `Thumbnail capture failed with partial file for ${job.data.key}: ${this.formatError(err)}. Retrying with full file.`,
+          );
+          await rm(sourcePath, { force: true }).catch(() => {});
+          sourcePath = await this.videoS3Service.downloadRangeToTempFile(
+            job.data.key,
+            undefined,
+            tempDir,
+            keyExt,
+          );
+
+          try {
+            ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
+          } catch (fullFileErr) {
+            this.logger.warn(
+              `Thumbnail capture failed with full file for ${job.data.key}: ${this.formatError(fullFileErr)}. Uploading fallback thumbnail.`,
+            );
+            ({ buffer: thumbnailBuffer, ext, contentType } = await this.createFallbackThumbnail(tempDir));
+          }
+        }
       }
     } finally {
       await rm(tempDir, { recursive: true, force: true }).catch(() => {});
@@ -168,7 +171,9 @@ export class VideoProcessor {
   private async optimizeVideoForPlayback(job: Job<VideoProcessJob>): Promise<void> {
     const key = job.data.key;
     const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-optimize-'));
-    const sourcePath = await this.videoS3Service.downloadRangeToTempFile(key, undefined, tempDir, '.mp4');
+    const keyExtMatch = key.match(/(\.[^./]+)$/);
+    const keyExt = keyExtMatch ? keyExtMatch[1].toLowerCase() : '.mp4';
+    const sourcePath = await this.videoS3Service.downloadRangeToTempFile(key, undefined, tempDir, keyExt);
     const outputPath = join(tempDir, 'video_faststart.mp4');
 
     try {
@@ -285,19 +290,68 @@ export class VideoProcessor {
     this.logger.log('Starting ffmpeg thumbnail capture');
 
     const useWebp = await this.supportsWebp();
-    const ext = useWebp ? '.webp' : '.jpg';
-    const contentType = useWebp ? 'image/webp' : 'image/jpeg';
-    const outputPath = join(tempDir, `thumbnail${ext}`);
+    const attempts = [
+      ...(useWebp ? [{ ext: '.webp', contentType: 'image/webp', codec: 'libwebp', format: 'webp' }] : []),
+      { ext: '.jpg', contentType: 'image/jpeg', codec: 'mjpeg', format: 'image2' },
+    ];
+    const seekTimes = [2, 1, 0];
+    let lastErr: unknown;
 
-    this.logger.log(`Thumbnail step: writing ffmpeg output to ${outputPath}`);
+    for (const attempt of attempts) {
+      for (const seekTime of seekTimes) {
+        const outputPath = join(tempDir, `thumbnail_${seekTime}s${attempt.ext}`);
+        this.logger.log(`Thumbnail step: writing ffmpeg output to ${outputPath} at ${seekTime}s`);
 
+        try {
+          await this.captureThumbnailAttempt(
+            videoPath,
+            outputPath,
+            seekTime,
+            attempt.codec,
+            attempt.format,
+          );
+
+          const thumbnailBuffer = await readFile(outputPath);
+          if (thumbnailBuffer.length === 0) {
+            throw new Error(`ffmpeg wrote empty thumbnail at ${outputPath}`);
+          }
+
+          this.logger.log(
+            `Finished ffmpeg thumbnail capture with ${thumbnailBuffer.length} bytes at ${outputPath}`,
+          );
+
+          return {
+            buffer: thumbnailBuffer,
+            ext: attempt.ext,
+            contentType: attempt.contentType,
+          };
+        } catch (err) {
+          lastErr = err;
+          this.logger.warn(
+            `Thumbnail attempt failed at ${seekTime}s as ${attempt.ext} for ${videoPath}: ${this.formatError(err)}`,
+          );
+          await rm(outputPath, { force: true }).catch(() => {});
+        }
+      }
+    }
+
+    throw new Error(`Failed to capture thumbnail after all attempts: ${this.formatError(lastErr)}`);
+  }
+
+  private async captureThumbnailAttempt(
+    videoPath: string,
+    outputPath: string,
+    seekTime: number,
+    codec: string,
+    format: string,
+  ): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       const command = ffmpeg(videoPath)
-        .seekInput(2)          // input seek: fast, no HTTPS involved — file is local
+        .seekInput(seekTime)
         .frames(1)
         .outputOptions(['-vf scale=320:-1', '-an', '-sn', '-dn'])
-        .videoCodec(useWebp ? 'libwebp' : 'mjpeg')
-        .format(useWebp ? 'webp' : 'image2')
+        .videoCodec(codec)
+        .format(format)
         .output(outputPath);
 
       command.once('end', resolve);
@@ -306,14 +360,20 @@ export class VideoProcessor {
       });
       command.run();
     });
+  }
 
-    const thumbnailBuffer = await readFile(outputPath);
-
-    this.logger.log(
-      `Finished ffmpeg thumbnail capture with ${thumbnailBuffer.length} bytes at ${outputPath}`,
+  private async createFallbackThumbnail(tempDir: string): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
+    this.logger.warn(`Thumbnail step: using embedded fallback thumbnail in ${tempDir}`);
+    const buffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+      'base64',
     );
 
-    return { buffer: thumbnailBuffer, ext, contentType };
+    return {
+      buffer,
+      ext: '.png',
+      contentType: 'image/png',
+    };
   }
 
   private async supportsWebp(): Promise<boolean> {
