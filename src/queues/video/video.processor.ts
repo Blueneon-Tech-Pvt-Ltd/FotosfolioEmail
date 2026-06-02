@@ -52,6 +52,7 @@ export class VideoProcessor {
 
   // 30MB covers ~2 seconds at up to ~200 Mbps — enough for any real-world video format
   private readonly THUMBNAIL_HEAD_BYTES = 30 * 1024 * 1024;
+  private readonly MOOV_SCAN_BYTES = 10 * 1024 * 1024;
 
   private async generateThumbnail(job: Job<VideoProcessJob>): Promise<void> {
     this.logger.log(`Thumbnail step: downloading first ${this.THUMBNAIL_HEAD_BYTES / 1024 / 1024}MB for ${job.data.key}`);
@@ -123,49 +124,73 @@ export class VideoProcessor {
   }
 
   private async extractMoov(job: Job<VideoProcessJob>): Promise<void> {
-    this.logger.log(`Moov step: requesting last 10MB bytes for ${job.data.key}`);
-    // Check last 10MB for unoptimized video moov atoms
-    const buffer = await this.videoS3Service.getObjectRange(job.data.key, 'bytes=-10000000');
+    this.logger.log(`Moov step: requesting last ${this.MOOV_SCAN_BYTES / 1024 / 1024}MB bytes for ${job.data.key}`);
+    const tailBuffer = await this.videoS3Service.getObjectRange(
+      job.data.key,
+      `bytes=-${this.MOOV_SCAN_BYTES}`,
+    );
+    const tailMoovBuffer = this.extractMoovBuffer(tailBuffer, job.data.key, 'tail');
+
+    let moovBuffer = tailMoovBuffer;
+
+    if (!moovBuffer) {
+      this.logger.log(
+        `Moov step: moov atom not found in tail for ${job.data.key}; requesting first ${this.MOOV_SCAN_BYTES / 1024 / 1024}MB bytes`,
+      );
+      const headBuffer = await this.videoS3Service.getObjectRange(
+        job.data.key,
+        `bytes=0-${this.MOOV_SCAN_BYTES - 1}`,
+      );
+      moovBuffer = this.extractMoovBuffer(headBuffer, job.data.key, 'head');
+    }
+
+    if (!moovBuffer) {
+      this.logger.warn(`Moov atom not found in scanned ranges for ${job.data.key}; skipping moov extraction`);
+      return;
+    }
+
+    const moovKey = this.deriveMoovKey(job.data.key);
+    this.assertArtifactKey(job.data.key, moovKey, 'moov');
+
+    this.logger.log(`Moov step: uploading ${moovKey}`);
+    await this.videoS3Service.uploadBuffer(moovKey, moovBuffer, 'application/octet-stream');
+
+    this.logger.log(`Moov atom extracted for ${moovKey} (${moovBuffer.length} bytes)`);
+  }
+
+  private extractMoovBuffer(buffer: Buffer, key: string, scanPosition: 'head' | 'tail'): Buffer | undefined {
     const moovOffset = this.findMoovOffset(buffer);
 
     if (moovOffset === -1) {
-      this.logger.warn(
-        `Moov atom not found in last 10MB for ${job.data.key}; skipping moov extraction because the file may already be faststart optimized`,
-      );
-      return;
+      return undefined;
     }
 
     const moovSize = this.readAtomSize(buffer, moovOffset);
 
     if (moovSize === undefined) {
       this.logger.warn(
-        `Moov atom header is invalid or incomplete for ${job.data.key}; skipping moov extraction`,
+        `Moov atom header is invalid or incomplete in ${scanPosition} range for ${key}; skipping moov extraction`,
       );
-      return;
+      return undefined;
     }
 
     const endOffset = moovOffset + moovSize;
 
     if (endOffset > buffer.length) {
       this.logger.warn(
-        `Moov atom is larger than downloaded range for ${job.data.key}; skipping truncated moov extraction`,
+        `Moov atom is larger than downloaded ${scanPosition} range for ${key}; skipping truncated moov extraction`,
       );
-      return;
+      return undefined;
     }
 
     const moovBuffer = buffer.slice(moovOffset, endOffset);
-    const moovKey = this.deriveMoovKey(job.data.key);
-    this.assertArtifactKey(job.data.key, moovKey, 'moov');
 
     if (moovBuffer.length === 0) {
-      this.logger.warn(`Moov atom is empty for ${job.data.key}; skipping moov upload`);
-      return;
+      this.logger.warn(`Moov atom is empty in ${scanPosition} range for ${key}; skipping moov extraction`);
+      return undefined;
     }
 
-    this.logger.log(`Moov step: uploading ${moovKey}`);
-    await this.videoS3Service.uploadBuffer(moovKey, moovBuffer, 'application/octet-stream');
-
-    this.logger.log(`Moov atom extracted for ${moovKey} (${moovBuffer.length} bytes)`);
+    return moovBuffer;
   }
 
   private async captureThumbnail(videoPath: string, tempDir: string): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
