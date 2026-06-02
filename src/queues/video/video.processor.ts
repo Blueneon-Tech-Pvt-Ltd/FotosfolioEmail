@@ -128,9 +128,10 @@ export class VideoProcessor {
     const moovOffset = this.findMoovOffset(buffer);
 
     if (moovOffset === -1) {
-      throw new Error(
-        'moov atom not found in last 10MB — file may be optimized (faststart), corrupt, or moov is unusually large',
+      this.logger.warn(
+        `Moov atom not found in last 10MB for ${job.data.key}; skipping moov extraction because the file may already be faststart optimized`,
       );
+      return;
     }
 
     // Atom size is a 32-bit big-endian integer at the start of the atom
