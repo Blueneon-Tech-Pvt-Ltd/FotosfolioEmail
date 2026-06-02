@@ -1,6 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  UploadPartCommand,
+} from '@aws-sdk/client-s3';
+import type { CompletedPart } from '@aws-sdk/client-s3';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'node:fs';
 import { join } from 'node:path';
@@ -101,6 +110,87 @@ export class VideoS3Service {
     }
 
     return Buffer.concat(chunks);
+  }
+
+  async getObjectStream(key: string): Promise<Readable> {
+    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+    const res = await this.client.send(cmd);
+
+    return res.Body as Readable;
+  }
+
+  async createMultipartUpload(key: string, contentType: string): Promise<string> {
+    const res = await this.client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ContentType: contentType,
+      }),
+    );
+
+    if (!res.UploadId) {
+      throw new Error(`S3 did not return an upload id for multipart upload ${key}`);
+    }
+
+    this.logger.log(`Started multipart upload for ${key}`);
+    return res.UploadId;
+  }
+
+  async uploadMultipartPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: Buffer,
+  ): Promise<CompletedPart> {
+    const res = await this.client.send(
+      new UploadPartCommand({
+        Bucket: this.bucket,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+        Body: body,
+      }),
+    );
+
+    if (!res.ETag) {
+      throw new Error(`S3 did not return an ETag for ${key} part ${partNumber}`);
+    }
+
+    return {
+      ETag: res.ETag,
+      PartNumber: partNumber,
+    };
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: CompletedPart[],
+  ): Promise<void> {
+    await this.client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts.sort((a, b) => (a.PartNumber ?? 0) - (b.PartNumber ?? 0)),
+        },
+      }),
+    );
+
+    this.logger.log(`Completed multipart upload for ${key} with ${parts.length} parts`);
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    await this.client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: this.bucket,
+        Key: key,
+        UploadId: uploadId,
+      }),
+    );
+
+    this.logger.log(`Aborted multipart upload for ${key}`);
   }
 
   /**
