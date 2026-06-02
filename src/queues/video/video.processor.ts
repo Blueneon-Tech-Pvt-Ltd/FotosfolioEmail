@@ -178,19 +178,10 @@ export class VideoProcessor {
 
     try {
       this.logger.log(`Playback optimization step: remuxing ${key} with faststart`);
-      await this.execFileP(ffmpegStatic as string, [
-        '-hide_banner',
-        '-y',
-        '-i',
-        sourcePath,
-        '-map',
-        '0',
-        '-c',
-        'copy',
-        '-movflags',
-        '+faststart',
-        outputPath,
-      ]);
+      await this.execFileP(
+        ffmpegStatic as string,
+        this.buildFaststartRemuxArgs(sourcePath, outputPath),
+      );
 
       const outputStat = await stat(outputPath);
       if (outputStat.size === 0) {
@@ -217,6 +208,30 @@ export class VideoProcessor {
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
+  }
+
+  private buildFaststartRemuxArgs(sourcePath: string, outputPath: string): string[] {
+    return [
+      '-hide_banner',
+      '-y',
+      '-i',
+      sourcePath,
+      '-map',
+      '0:v:0',
+      '-map',
+      '0:a?',
+      '-map_metadata',
+      '0',
+      '-map_chapters',
+      '-1',
+      '-c',
+      'copy',
+      '-sn',
+      '-dn',
+      '-movflags',
+      '+faststart',
+      outputPath,
+    ];
   }
 
   private async uploadMultipartStream(
