@@ -150,6 +150,8 @@ export class VideoS3Service {
     let lastErr: any;
     for (let i = 0; i < attempts; i++) {
       try {
+        this.logger.log(`Uploading ${buffer.length} bytes to ${key} (${contentType})`);
+
         const cmd = new PutObjectCommand({
           Bucket: this.bucket,
           Key: key,

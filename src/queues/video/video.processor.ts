@@ -108,13 +108,14 @@ export class VideoProcessor {
     );
 
     const thumbnailKey = this.deriveThumbnailKey(job.data.key, ext!);
+    this.assertArtifactKey(job.data.key, thumbnailKey, 'thumbnail');
+
+    if (thumbnailBuffer!.length === 0) {
+      throw new Error(`Thumbnail generated empty buffer for ${thumbnailKey}`);
+    }
 
     this.logger.log(`Thumbnail step: uploading ${thumbnailKey}`);
     await this.videoS3Service.uploadBuffer(thumbnailKey, thumbnailBuffer!, contentType!);
-
-    if (thumbnailBuffer!.length === 0) {
-      this.logger.warn(`Thumbnail generated empty buffer for ${thumbnailKey}`);
-    }
 
     this.logger.log(
       `Thumbnail generated for ${thumbnailKey} (${Math.round(thumbnailBuffer!.length / 1024)} KB)`,
@@ -134,13 +135,32 @@ export class VideoProcessor {
       return;
     }
 
-    // Atom size is a 32-bit big-endian integer at the start of the atom
-    const moovSize = buffer.readUInt32BE(moovOffset);
-    
-    // Ensure we don't slice beyond the buffer if moov is cut off (though we fetched 10MB, it should fit)
-    const endOffset = Math.min(moovOffset + moovSize, buffer.length);
+    const moovSize = this.readAtomSize(buffer, moovOffset);
+
+    if (moovSize === undefined) {
+      this.logger.warn(
+        `Moov atom header is invalid or incomplete for ${job.data.key}; skipping moov extraction`,
+      );
+      return;
+    }
+
+    const endOffset = moovOffset + moovSize;
+
+    if (endOffset > buffer.length) {
+      this.logger.warn(
+        `Moov atom is larger than downloaded range for ${job.data.key}; skipping truncated moov extraction`,
+      );
+      return;
+    }
+
     const moovBuffer = buffer.slice(moovOffset, endOffset);
     const moovKey = this.deriveMoovKey(job.data.key);
+    this.assertArtifactKey(job.data.key, moovKey, 'moov');
+
+    if (moovBuffer.length === 0) {
+      this.logger.warn(`Moov atom is empty for ${job.data.key}; skipping moov upload`);
+      return;
+    }
 
     this.logger.log(`Moov step: uploading ${moovKey}`);
     await this.videoS3Service.uploadBuffer(moovKey, moovBuffer, 'application/octet-stream');
@@ -210,8 +230,39 @@ export class VideoProcessor {
     return -1;
   }
 
+  private readAtomSize(buffer: Buffer, offset: number): number | undefined {
+    if (offset + 8 > buffer.length) {
+      return undefined;
+    }
+
+    const size = buffer.readUInt32BE(offset);
+
+    if (size === 0) {
+      return buffer.length - offset;
+    }
+
+    if (size === 1) {
+      if (offset + 16 > buffer.length) {
+        return undefined;
+      }
+
+      const largeSize = buffer.readBigUInt64BE(offset + 8);
+
+      if (largeSize > BigInt(Number.MAX_SAFE_INTEGER)) {
+        return undefined;
+      }
+
+      const numericSize = Number(largeSize);
+      return numericSize >= 16 ? numericSize : undefined;
+    }
+
+    return size >= 8 ? size : undefined;
+  }
+
   private deriveThumbnailKey(key: string, ext = '.jpg'): string {
-    const previewKey = key.replace('/Original/', '/Preview/');
+    const previewKey = key
+      .replace(/^Original\//, 'Preview/')
+      .replace('/Original/', '/Preview/');
 
     return this.replaceExtension(previewKey, ext);
   }
@@ -226,6 +277,14 @@ export class VideoProcessor {
     }
 
     return `${key}${extension}`;
+  }
+
+  private assertArtifactKey(sourceKey: string, artifactKey: string, taskName: string): void {
+    if (artifactKey === sourceKey) {
+      throw new Error(
+        `${taskName} artifact key resolved to source video key ${sourceKey}; refusing to overwrite original video`,
+      );
+    }
   }
 
   private logSettledResult(
