@@ -8,6 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { VideoProcessJob } from './video.job.interface';
 import { VideoProcessor } from './video.processor';
+import {
+  getVideoQueueConnectionConfig,
+  VIDEO_PROCESS_QUEUE_NAME,
+} from './video-queue.config';
 
 @Injectable()
 export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
@@ -20,17 +24,15 @@ export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    const connection = {
-      host: this.configService.get<string>('REDIS_HOST') ?? 'localhost',
-      port: Number(this.configService.get<string>('REDIS_PORT') ?? 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD') ?? undefined,
-    };
+    const { connection, prefix, description } =
+      getVideoQueueConnectionConfig(this.configService);
 
     this.worker = new Worker<VideoProcessJob>(
-      'video-process',
+      VIDEO_PROCESS_QUEUE_NAME,
       async (job: Job<VideoProcessJob>) => this.videoProcessor.process(job),
       {
         connection,
+        prefix,
         concurrency: 5,
       },
     );
@@ -79,7 +81,7 @@ export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('Video process worker closing');
     });
 
-    this.logger.log('Video process worker initialized');
+    this.logger.log(`Video process worker initialized (${description})`);
   }
 
   async onModuleDestroy(): Promise<void> {

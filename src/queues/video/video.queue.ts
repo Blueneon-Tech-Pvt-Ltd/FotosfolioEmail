@@ -7,6 +7,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { VideoProcessJob } from './video.job.interface';
+import {
+  getVideoQueueConnectionConfig,
+  VIDEO_PROCESS_QUEUE_NAME,
+} from './video-queue.config';
 
 @Injectable()
 export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
@@ -16,14 +20,12 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
-    const connection = {
-      host: this.configService.get<string>('REDIS_HOST') ?? 'localhost',
-      port: Number(this.configService.get<string>('REDIS_PORT') ?? 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD') ?? undefined,
-    };
+    const { connection, prefix, description } =
+      getVideoQueueConnectionConfig(this.configService);
 
-    this.queue = new Queue<VideoProcessJob>('video-process', {
+    this.queue = new Queue<VideoProcessJob>(VIDEO_PROCESS_QUEUE_NAME, {
       connection,
+      prefix,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -35,7 +37,7 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
       },
     });
 
-    this.logger.log('Video process queue initialized');
+    this.logger.log(`Video process queue initialized (${description})`);
   }
 
   async addVideoProcessJob(data: VideoProcessJob): Promise<void> {
@@ -51,7 +53,7 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const job = await this.queue.add('video-process', data, {
+    const job = await this.queue.add(VIDEO_PROCESS_QUEUE_NAME, data, {
       jobId: data.uploadId,
     });
 

@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AppLoggerService } from './logger/logger.service';
 
@@ -40,6 +41,28 @@ async function bootstrap() {
   
   // Handle termination signals for graceful shutdown
   const logger = app.get(AppLoggerService);
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now();
+
+    logger.log({
+      event: 'http_request',
+      method: req.method,
+      url: req.originalUrl ?? req.url,
+    });
+
+    res.on('finish', () => {
+      logger.log({
+        event: 'http_response',
+        method: req.method,
+        url: req.originalUrl ?? req.url,
+        statusCode: res.statusCode,
+        responseTime: `${Date.now() - startTime}ms`,
+      });
+    });
+
+    next();
+  });
   
   process.on('SIGTERM', async () => {
     logger.log('SIGTERM signal received - initiating graceful shutdown...');

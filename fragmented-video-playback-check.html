@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fragmented MP4 Playback Check</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f6f7f9;
+      color: #1d2733;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding: 16px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #cbd3df;
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .controls label {
+      min-width: 220px;
+      flex: 1;
+    }
+
+    button {
+      width: fit-content;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 6px;
+      background: #1267d8;
+      color: white;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    video {
+      width: 100%;
+      max-height: 62vh;
+      background: #000;
+      border-radius: 8px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    section {
+      padding: 16px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 8px 12px;
+      margin: 0;
+      font-size: 14px;
+    }
+
+    dt {
+      font-weight: 700;
+      color: #465569;
+    }
+
+    dd {
+      margin: 0;
+      word-break: break-word;
+    }
+
+    pre {
+      min-height: 120px;
+      max-height: 260px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      border-radius: 6px;
+      background: #101828;
+      color: #d1e7ff;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 14px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        background: #111827;
+        color: #e5e7eb;
+      }
+
+      form,
+      section {
+        border-color: #334155;
+        background: #1f2937;
+      }
+
+      input,
+      select {
+        border-color: #475569;
+        background: #111827;
+        color: #e5e7eb;
+      }
+
+      dt {
+        color: #cbd5e1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Fragmented MP4 Playback Check</h1>
+
+    <form id="loader-form">
+      <label>
+        Fragmented MP4 URL
+        <input id="video-url" name="video" type="url" placeholder="https://bucket.example/video.mp4" required>
+      </label>
+      <label>
+        Moov file URL
+        <input id="moov-url" name="moov" type="url" placeholder="https://bucket.example/video.moov">
+      </label>
+      <div class="controls">
+        <label>
+          Playback mode
+          <select id="playback-mode" name="mode">
+            <option value="mse">MSE fragmented range loader</option>
+            <option value="direct">Direct video element</option>
+          </select>
+        </label>
+        <button type="submit">Load Video</button>
+      </div>
+    </form>
+
+    <video id="video" controls preload="metadata" playsinline></video>
+
+    <div class="grid">
+      <section>
+        <h2>Playback</h2>
+        <dl>
+          <dt>Ready state</dt>
+          <dd id="ready-state">-</dd>
+          <dt>Network state</dt>
+          <dd id="network-state">-</dd>
+          <dt>Duration</dt>
+          <dd id="duration">-</dd>
+          <dt>Current time</dt>
+          <dd id="current-time">-</dd>
+          <dt>Seekable</dt>
+          <dd id="seekable">-</dd>
+          <dt>Buffered</dt>
+          <dd id="buffered">-</dd>
+          <dt>Last seek time</dt>
+          <dd id="last-seek">-</dd>
+          <dt>Loader</dt>
+          <dd id="loader-state">-</dd>
+          <dt>Bytes appended</dt>
+          <dd id="bytes-appended">-</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Moov</h2>
+        <dl>
+          <dt>Status</dt>
+          <dd id="moov-status">Not loaded</dd>
+          <dt>Size</dt>
+          <dd id="moov-size">-</dd>
+          <dt>Header</dt>
+          <dd id="moov-header">-</dd>
+        </dl>
+      </section>
+    </div>
+
+    <section style="margin-top: 16px;">
+      <h2>Events</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('loader-form');
+    const video = document.getElementById('video');
+    const videoUrlInput = document.getElementById('video-url');
+    const moovUrlInput = document.getElementById('moov-url');
+    const playbackModeInput = document.getElementById('playback-mode');
+    const logBox = document.getElementById('log');
+    const fields = {
+      readyState: document.getElementById('ready-state'),
+      networkState: document.getElementById('network-state'),
+      duration: document.getElementById('duration'),
+      currentTime: document.getElementById('current-time'),
+      seekable: document.getElementById('seekable'),
+      buffered: document.getElementById('buffered'),
+      lastSeek: document.getElementById('last-seek'),
+      loaderState: document.getElementById('loader-state'),
+      bytesAppended: document.getElementById('bytes-appended'),
+      moovStatus: document.getElementById('moov-status'),
+      moovSize: document.getElementById('moov-size'),
+      moovHeader: document.getElementById('moov-header'),
+    };
+    let seekStartedAt = 0;
+    let activeLoader;
+
+    const readyStates = ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'];
+    const networkStates = ['NETWORK_EMPTY', 'NETWORK_IDLE', 'NETWORK_LOADING', 'NETWORK_NO_SOURCE'];
+    const textDecoder = new TextDecoder('ascii');
+    const rangeChunkSize = 2 * 1024 * 1024;
+    const defaultFtyp = new Uint8Array([
+      0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
+      0x69, 0x73, 0x6f, 0x36, 0x00, 0x00, 0x02, 0x00,
+      0x69, 0x73, 0x6f, 0x36, 0x6d, 0x70, 0x34, 0x31,
+      0x69, 0x73, 0x6f, 0x6d, 0x64, 0x61, 0x73, 0x68,
+    ]);
+
+    function log(message) {
+      const stamp = new Date().toISOString().replace('T', ' ').replace('Z', '');
+      logBox.textContent = `${stamp} ${message}\n${logBox.textContent}`.slice(0, 12000);
+    }
+
+    function formatSeconds(value) {
+      return Number.isFinite(value) ? `${value.toFixed(3)}s` : '-';
+    }
+
+    function formatRanges(ranges) {
+      if (!ranges || ranges.length === 0) return '-';
+      const values = [];
+      for (let index = 0; index < ranges.length; index += 1) {
+        values.push(`${ranges.start(index).toFixed(3)}s - ${ranges.end(index).toFixed(3)}s`);
+      }
+      return values.join(', ');
+    }
+
+    function updatePlaybackStats() {
+      fields.readyState.textContent = readyStates[video.readyState] || String(video.readyState);
+      fields.networkState.textContent = networkStates[video.networkState] || String(video.networkState);
+      fields.duration.textContent = formatSeconds(video.duration);
+      fields.currentTime.textContent = formatSeconds(video.currentTime);
+      fields.seekable.textContent = formatRanges(video.seekable);
+      fields.buffered.textContent = formatRanges(video.buffered);
+    }
+
+    function describeMediaError() {
+      if (!video.error) return 'unknown media error';
+      const names = {
+        1: 'MEDIA_ERR_ABORTED',
+        2: 'MEDIA_ERR_NETWORK',
+        3: 'MEDIA_ERR_DECODE',
+        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED',
+      };
+      return names[video.error.code] || `MEDIA_ERR_${video.error.code}`;
+    }
+
+    function setQueryParams(videoUrl, moovUrl, mode) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('video', videoUrl);
+      url.searchParams.set('mode', mode);
+      if (moovUrl) {
+        url.searchParams.set('moov', moovUrl);
+      } else {
+        url.searchParams.delete('moov');
+      }
+      history.replaceState(null, '', url);
+    }
+
+    function setLoaderState(message) {
+      fields.loaderState.textContent = message;
+    }
+
+    function concatBytes(parts) {
+      const total = parts.reduce((size, part) => size + part.byteLength, 0);
+      const output = new Uint8Array(total);
+      let offset = 0;
+      for (const part of parts) {
+        output.set(part, offset);
+        offset += part.byteLength;
+      }
+      return output;
+    }
+
+    function boxType(bytes, offset) {
+      if (offset + 8 > bytes.byteLength) return '';
+      return textDecoder.decode(bytes.slice(offset + 4, offset + 8));
+    }
+
+    function boxSize(bytes, offset) {
+      if (offset + 8 > bytes.byteLength) return 0;
+      const view = new DataView(bytes.buffer, bytes.byteOffset + offset, bytes.byteLength - offset);
+      const size = view.getUint32(0);
+      if (size === 1 && offset + 16 <= bytes.byteLength) {
+        const largeSize = view.getBigUint64(8);
+        return largeSize <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(largeSize) : 0;
+      }
+      return size;
+    }
+
+    function findFirstBox(bytes, type) {
+      for (let offset = 0; offset <= bytes.byteLength - 8;) {
+        const size = boxSize(bytes, offset);
+        const currentType = boxType(bytes, offset);
+        if (currentType === type) return offset;
+        if (size < 8) break;
+        offset += size;
+      }
+      return -1;
+    }
+
+    function normalizeInitSegment(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const firstType = boxType(bytes, 0);
+      const firstMoof = findFirstBox(bytes, 'moof');
+      if (firstType === 'ftyp') return firstMoof > 0 ? bytes.slice(0, firstMoof) : bytes;
+      if (firstType === 'moov') {
+        const moovSize = boxSize(bytes, 0);
+        const moov = moovSize >= 8 ? bytes.slice(0, moovSize) : bytes;
+        return concatBytes([defaultFtyp, moov]);
+      }
+      const moovOffset = findFirstBox(bytes, 'moov');
+      if (moovOffset > 0) {
+        const moovSize = boxSize(bytes, moovOffset);
+        const moovEnd = moovSize >= 8 ? moovOffset + moovSize : bytes.byteLength;
+        return concatBytes([defaultFtyp, bytes.slice(moovOffset, moovEnd)]);
+      }
+      return bytes;
+    }
+
+    function hexByte(value) {
+      return value.toString(16).padStart(2, '0');
+    }
+
+    function findNestedBox(bytes, parentStart, parentEnd, type) {
+      for (let offset = parentStart; offset <= parentEnd - 8;) {
+        const size = boxSize(bytes, offset);
+        if (boxType(bytes, offset) === type) return offset;
+        if (size < 8) break;
+        offset += size;
+      }
+
+      for (let offset = parentStart; offset <= parentEnd - 8; offset += 1) {
+        const size = boxSize(bytes, offset);
+        if (size >= 8 && offset + size <= parentEnd && boxType(bytes, offset) === type) {
+          return offset;
+        }
+      }
+
+      return -1;
+    }
+
+    function parseAvcCodec(bytes, entryStart, entryEnd) {
+      const avcCOffset = findNestedBox(bytes, entryStart + 8, entryEnd, 'avcC');
+      if (avcCOffset < 0 || avcCOffset + 12 > bytes.byteLength) return 'avc1';
+      return `avc1.${hexByte(bytes[avcCOffset + 9])}${hexByte(bytes[avcCOffset + 10])}${hexByte(bytes[avcCOffset + 11])}`;
+    }
+
+    function parseHevcCodec(bytes, entryStart, entryEnd, sampleType) {
+      const hvcCOffset = findNestedBox(bytes, entryStart + 8, entryEnd, 'hvcC');
+      if (hvcCOffset < 0 || hvcCOffset + 23 > bytes.byteLength) return sampleType;
+
+      const profileByte = bytes[hvcCOffset + 9];
+      const profileSpace = profileByte >> 6;
+      const profileIdc = profileByte & 0x1f;
+      const compatibility = new DataView(bytes.buffer, bytes.byteOffset + hvcCOffset + 10, 4).getUint32(0);
+      const tierFlag = (bytes[hvcCOffset + 14] & 0x20) ? 'H' : 'L';
+      const levelIdc = bytes[hvcCOffset + 21];
+      const spaces = ['', 'A', 'B', 'C'];
+      return `${sampleType}.${spaces[profileSpace]}${profileIdc}.${compatibility.toString(16).toUpperCase()}.${tierFlag}${levelIdc}`;
+    }
+
+    function parseMp4aCodec(bytes, entryStart, entryEnd) {
+      const esdsOffset = findNestedBox(bytes, entryStart + 8, entryEnd, 'esds');
+      if (esdsOffset < 0) return 'mp4a.40.2';
+
+      const end = Math.min(entryEnd, esdsOffset + boxSize(bytes, esdsOffset));
+      for (let offset = esdsOffset + 12; offset < end - 1; offset += 1) {
+        if (bytes[offset] === 0x40) return 'mp4a.40.2';
+        if (bytes[offset] === 0x66 || bytes[offset] === 0x67 || bytes[offset] === 0x68) return 'mp4a.40.5';
+      }
+      return 'mp4a.40.2';
+    }
+
+    function collectCodecsFromStsd(bytes, stsdOffset, codecs) {
+      const stsdSize = boxSize(bytes, stsdOffset);
+      const stsdEnd = Math.min(bytes.byteLength, stsdOffset + stsdSize);
+      let offset = stsdOffset + 16;
+
+      while (offset <= stsdEnd - 8) {
+        const size = boxSize(bytes, offset);
+        const sampleType = boxType(bytes, offset);
+        const entryEnd = offset + size;
+
+        if (size < 8 || entryEnd > stsdEnd) break;
+        if (sampleType === 'avc1' || sampleType === 'avc3') {
+          codecs.add(parseAvcCodec(bytes, offset, entryEnd));
+        } else if (sampleType === 'hvc1' || sampleType === 'hev1') {
+          codecs.add(parseHevcCodec(bytes, offset, entryEnd, sampleType));
+        } else if (sampleType === 'mp4a') {
+          codecs.add(parseMp4aCodec(bytes, offset, entryEnd));
+        }
+
+        offset = entryEnd;
+      }
+    }
+
+    function findStsdBoxes(bytes, start, end, codecs) {
+      const containerTypes = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl']);
+      for (let offset = start; offset <= end - 8;) {
+        const size = boxSize(bytes, offset);
+        const type = boxType(bytes, offset);
+        const next = offset + size;
+
+        if (size < 8 || next > end) break;
+        if (type === 'stsd') {
+          collectCodecsFromStsd(bytes, offset, codecs);
+        } else if (containerTypes.has(type)) {
+          findStsdBoxes(bytes, offset + 8, next, codecs);
+        }
+
+        offset = next;
+      }
+    }
+
+    function codecsFromInitSegment(initSegment) {
+      const codecs = new Set();
+      findStsdBoxes(initSegment, 0, initSegment.byteLength, codecs);
+      return Array.from(codecs);
+    }
+
+    function describeTopLevelBoxes(bytes) {
+      const descriptions = [];
+      for (let offset = 0; offset <= bytes.byteLength - 8 && descriptions.length < 20;) {
+        const size = boxSize(bytes, offset);
+        const type = boxType(bytes, offset);
+        if (!type || size < 8 || offset + size > bytes.byteLength) break;
+        descriptions.push(`${type}:${size}`);
+        offset += size;
+      }
+      return descriptions.join(', ') || 'none';
+    }
+
+    function hasNestedBox(bytes, type) {
+      return findNestedBox(bytes, 0, bytes.byteLength, type) >= 0;
+    }
+
+    function parseContentLength(response, fallbackLength) {
+      const contentRange = response.headers.get('content-range');
+      const match = contentRange && contentRange.match(/\/(\d+)$/);
+      if (match) return Number(match[1]);
+      const length = response.headers.get('content-length');
+      return length ? Number(length) : fallbackLength;
+    }
+
+    async function fetchBytes(url, options = {}) {
+      const headers = {};
+      if (options.start !== undefined || options.end !== undefined) {
+        const start = options.start ?? '';
+        const end = options.end ?? '';
+        headers.Range = `bytes=${start}-${end}`;
+      }
+
+      const response = await fetch(url, { headers, signal: options.signal });
+      if (!response.ok && response.status !== 206) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return {
+        buffer: await response.arrayBuffer(),
+        contentLength: parseContentLength(response),
+      };
+    }
+
+    async function loadMoov(url, signal) {
+      fields.moovStatus.textContent = 'Loading';
+      fields.moovSize.textContent = '-';
+      fields.moovHeader.textContent = '-';
+
+      if (!url) {
+        fields.moovStatus.textContent = 'Not provided';
+        return;
+      }
+
+      try {
+        const response = await fetch(url, { signal });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const headerBytes = Array.from(bytes.slice(0, 32));
+        fields.moovStatus.textContent = 'Loaded';
+        fields.moovSize.textContent = `${buffer.byteLength.toLocaleString()} bytes`;
+        fields.moovHeader.textContent = headerBytes.map((byte) => byte.toString(16).padStart(2, '0')).join(' ');
+        log(`moov loaded: ${buffer.byteLength} bytes`);
+      } catch (error) {
+        fields.moovStatus.textContent = 'Failed';
+        log(`moov fetch failed: ${error.message || String(error)}`);
+      }
+    }
+
+    function resetVideo() {
+      if (activeLoader) {
+        activeLoader.abort();
+        activeLoader = undefined;
+      }
+
+      if (video.src && video.src.startsWith('blob:')) {
+        URL.revokeObjectURL(video.src);
+      }
+
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      fields.bytesAppended.textContent = '-';
+      setLoaderState('-');
+    }
+
+    function appendBuffer(sourceBuffer, bytes, label) {
+      return new Promise((resolve, reject) => {
+        const onError = () => {
+          cleanup();
+          reject(new Error(`SourceBuffer append failed while appending ${label}`));
+        };
+        const onUpdateEnd = () => {
+          cleanup();
+          resolve();
+        };
+        const cleanup = () => {
+          sourceBuffer.removeEventListener('error', onError);
+          sourceBuffer.removeEventListener('updateend', onUpdateEnd);
+        };
+
+        sourceBuffer.addEventListener('error', onError, { once: true });
+        sourceBuffer.addEventListener('updateend', onUpdateEnd, { once: true });
+        sourceBuffer.appendBuffer(bytes);
+      });
+    }
+
+    function getMimeCandidates(initSegment) {
+      const codecs = codecsFromInitSegment(initSegment);
+      const candidates = codecs.length > 0
+        ? [`video/mp4; codecs="${codecs.join(', ')}"`, 'video/mp4']
+        : ['video/mp4'];
+      log(`MSE codec candidates: ${candidates.join(' | ')}`);
+      return candidates.filter((mimeType) => MediaSource.isTypeSupported(mimeType));
+    }
+
+    async function readTopLevelBox(url, offset, contentLength, signal) {
+      const headerEnd = Math.min(offset + 15, contentLength - 1);
+      const header = new Uint8Array((await fetchBytes(url, { start: offset, end: headerEnd, signal })).buffer);
+      const type = boxType(header, 0);
+      let size = boxSize(header, 0);
+      let headerSize = size === 1 ? 16 : 8;
+
+      if (size === 0) {
+        size = contentLength - offset;
+      }
+
+      if (!type || size < headerSize || offset + size > contentLength + 1) {
+        throw new Error(`Invalid MP4 box at byte ${offset}`);
+      }
+
+      const end = offset + size - 1;
+      const data = new Uint8Array((await fetchBytes(url, { start: offset, end, signal })).buffer);
+      return { type, size, data, nextOffset: offset + size };
+    }
+
+    async function prepareFragmentedMp4(videoUrl, moovUrl, signal) {
+      let initSegment;
+      let mediaOffset = 0;
+      let contentLength = 0;
+
+      if (moovUrl) {
+        initSegment = normalizeInitSegment((await fetchBytes(moovUrl, { signal })).buffer);
+        const headResult = await fetchBytes(videoUrl, { start: 0, end: rangeChunkSize - 1, signal });
+        const head = new Uint8Array(headResult.buffer);
+        contentLength = headResult.contentLength || head.byteLength;
+        const firstMoof = findFirstBox(head, 'moof');
+        mediaOffset = firstMoof >= 0 ? firstMoof : 0;
+      } else {
+        const headResult = await fetchBytes(videoUrl, { start: 0, end: rangeChunkSize - 1, signal });
+        const head = new Uint8Array(headResult.buffer);
+        contentLength = headResult.contentLength || head.byteLength;
+        const firstMoof = findFirstBox(head, 'moof');
+        if (firstMoof < 0) {
+          throw new Error('Could not find the first moof box in the MP4 head');
+        }
+        initSegment = head.slice(0, firstMoof);
+        mediaOffset = firstMoof;
+      }
+
+      log(`init boxes: ${describeTopLevelBoxes(initSegment)}`);
+      log(`init has mvex: ${hasNestedBox(initSegment, 'mvex') ? 'yes' : 'no'}`);
+      if (!hasNestedBox(initSegment, 'mvex')) {
+        log('warning: init segment has no mvex box; MSE fragmented playback usually requires mvex in moov');
+      }
+      return { initSegment, mediaOffset, contentLength };
+    }
+
+    async function openMediaSource(mimeType, signal) {
+      if (!window.MediaSource) {
+        throw new Error('MediaSource is not available in this browser');
+      }
+
+      const mediaSource = new MediaSource();
+      video.src = URL.createObjectURL(mediaSource);
+      setLoaderState('Opening MediaSource');
+
+      await new Promise((resolve, reject) => {
+        mediaSource.addEventListener('sourceopen', resolve, { once: true });
+        mediaSource.addEventListener('error', () => reject(new Error('MediaSource failed to open')), { once: true });
+      });
+
+      const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+      sourceBuffer.mode = 'segments';
+      setLoaderState(`Using ${mimeType}`);
+      return { mediaSource, sourceBuffer };
+    }
+
+    async function appendFragmentedMp4(videoUrl, initSegment, mediaOffset, contentLength, mimeType, signal) {
+      const { mediaSource, sourceBuffer } = await openMediaSource(mimeType, signal);
+
+      await appendBuffer(sourceBuffer, initSegment, 'init segment');
+      fields.moovStatus.textContent = 'Init appended';
+      fields.moovSize.textContent = `${initSegment.byteLength.toLocaleString()} bytes`;
+      fields.moovHeader.textContent = Array.from(initSegment.slice(0, 32)).map((byte) => byte.toString(16).padStart(2, '0')).join(' ');
+      log(`init appended: ${initSegment.byteLength} bytes`);
+
+      let appendedBytes = initSegment.byteLength;
+      let offset = mediaOffset;
+
+      while (!signal.aborted && offset < contentLength) {
+        const first = await readTopLevelBox(videoUrl, offset, contentLength, signal);
+        offset = first.nextOffset;
+
+        if (first.type === 'ftyp' || first.type === 'moov' || first.type === 'free') {
+          continue;
+        }
+
+        let segment = first.data;
+        if (first.type === 'moof' && offset < contentLength) {
+          const second = await readTopLevelBox(videoUrl, offset, contentLength, signal);
+          if (second.type === 'mdat') {
+            segment = concatBytes([first.data, second.data]);
+            offset = second.nextOffset;
+          }
+        }
+
+        await appendBuffer(sourceBuffer, segment, first.type);
+        appendedBytes += segment.byteLength;
+        fields.bytesAppended.textContent = `${appendedBytes.toLocaleString()} / ${contentLength.toLocaleString()}`;
+        setLoaderState(`Appended ${boxType(segment, 0) || first.type} at byte ${offset.toLocaleString()}`);
+        updatePlaybackStats();
+
+        if (video.paused && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          video.play().catch(() => {});
+        }
+      }
+
+      if (!signal.aborted && mediaSource.readyState === 'open') {
+        mediaSource.endOfStream();
+        setLoaderState('Completed');
+      }
+    }
+
+    async function loadMse(videoUrl, moovUrl, signal) {
+      if (!window.MediaSource) {
+        throw new Error('MediaSource is not available in this browser');
+      }
+
+      const { initSegment, mediaOffset, contentLength } = await prepareFragmentedMp4(videoUrl, moovUrl, signal);
+      const mimeCandidates = getMimeCandidates(initSegment);
+      if (mimeCandidates.length === 0) {
+        throw new Error(`No supported MP4 MSE MIME type found for codecs: ${codecsFromInitSegment(initSegment).join(', ') || 'unknown'}`);
+      }
+
+      let lastError;
+      for (const mimeType of mimeCandidates) {
+        try {
+          await appendFragmentedMp4(videoUrl, initSegment, mediaOffset, contentLength, mimeType, signal);
+          return;
+        } catch (error) {
+          if (signal.aborted) return;
+          lastError = error;
+          log(`MSE attempt failed for ${mimeType}: ${error.message || String(error)}`);
+          if (video.src && video.src.startsWith('blob:')) {
+            URL.revokeObjectURL(video.src);
+          }
+        }
+      }
+
+      throw lastError || new Error('MSE playback failed');
+    }
+
+    function loadVideo(videoUrl, moovUrl, mode) {
+      resetVideo();
+      const controller = new AbortController();
+      activeLoader = controller;
+      setQueryParams(videoUrl, moovUrl, mode);
+      updatePlaybackStats();
+      log(`video loaded: ${videoUrl}`);
+
+      if (mode === 'direct') {
+        video.src = videoUrl;
+        video.load();
+        setLoaderState('Direct video element');
+        loadMoov(moovUrl, controller.signal);
+        return;
+      }
+
+      loadMse(videoUrl, moovUrl, controller.signal).catch((error) => {
+        if (controller.signal.aborted) return;
+        log(`MSE failed: ${error.message || String(error)}`);
+        setLoaderState('MSE failed, falling back to direct');
+        video.src = videoUrl;
+        video.load();
+      });
+    }
+
+    function isTimeBuffered(time) {
+      for (let index = 0; index < video.buffered.length; index += 1) {
+        if (time >= video.buffered.start(index) && time <= video.buffered.end(index)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function loadVideoFromForm() {
+      const videoUrl = videoUrlInput.value.trim();
+      const moovUrl = moovUrlInput.value.trim();
+      const mode = playbackModeInput.value;
+      loadVideo(videoUrl, moovUrl, mode);
+    }
+
+    function loadDirectVideo(videoUrl, moovUrl) {
+      video.src = videoUrl;
+      video.load();
+      setQueryParams(videoUrl, moovUrl, 'direct');
+      updatePlaybackStats();
+      log(`video loaded: ${videoUrl}`);
+      loadMoov(moovUrl);
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      loadVideoFromForm();
+    });
+
+    [
+      'loadstart',
+      'loadedmetadata',
+      'loadeddata',
+      'canplay',
+      'canplaythrough',
+      'progress',
+      'play',
+      'pause',
+      'waiting',
+      'stalled',
+      'suspend',
+      'error',
+      'seeking',
+      'seeked',
+      'timeupdate',
+      'durationchange',
+    ].forEach((eventName) => {
+      video.addEventListener(eventName, () => {
+        if (eventName === 'seeking') {
+          seekStartedAt = performance.now();
+          log(`seeking to ${formatSeconds(video.currentTime)}`);
+          if (playbackModeInput.value === 'mse' && !isTimeBuffered(video.currentTime)) {
+            log('seek target is not buffered yet; wait for more fragments or use a file with sidx/index data for random-access seeking');
+          }
+        } else if (eventName === 'seeked') {
+          const elapsed = seekStartedAt ? performance.now() - seekStartedAt : 0;
+          fields.lastSeek.textContent = `${elapsed.toFixed(1)}ms`;
+          log(`seeked in ${elapsed.toFixed(1)}ms at ${formatSeconds(video.currentTime)}`);
+        } else if (eventName === 'error') {
+          log(describeMediaError());
+        } else if (eventName !== 'timeupdate' && eventName !== 'progress') {
+          log(eventName);
+        }
+        updatePlaybackStats();
+      });
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const initialVideoUrl = params.get('video') || '';
+    const initialMoovUrl = params.get('moov') || '';
+    const initialMode = params.get('mode') || 'mse';
+    videoUrlInput.value = initialVideoUrl;
+    moovUrlInput.value = initialMoovUrl;
+    playbackModeInput.value = initialMode === 'direct' ? 'direct' : 'mse';
+
+    if (initialVideoUrl) {
+      loadVideo(initialVideoUrl, initialMoovUrl, playbackModeInput.value);
+    } else {
+      updatePlaybackStats();
+    }
+  </script>
+</body>
+</html>
