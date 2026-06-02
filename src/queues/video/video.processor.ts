@@ -1,16 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { CompletedPart } from '@aws-sdk/client-s3';
 import { Job } from 'bullmq';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
-import { execFile, spawn } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { VideoProcessJob } from './video.job.interface';
 import { VideoS3Service } from './video.s3.service';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 
 ffmpeg.setFfmpegPath(ffmpegStatic as string);
@@ -44,8 +44,8 @@ export class VideoProcessor {
 
     await job.updateProgress(50);
 
-    this.logger.log(`Step 3/4: fragmenting video for ${job.data.key}`);
-    await this.fragmentVideo(job);
+    this.logger.log(`Step 3/4: optimizing video for browser playback for ${job.data.key}`);
+    await this.optimizeVideoForPlayback(job);
     await job.updateProgress(90);
 
     this.logger.log(`Step 4/4: marking ${job.data.key} as complete`);
@@ -165,105 +165,56 @@ export class VideoProcessor {
     this.logger.log(`Moov atom extracted for ${moovKey} (${moovBuffer.length} bytes)`);
   }
 
-  private async fragmentVideo(job: Job<VideoProcessJob>): Promise<void> {
+  private async optimizeVideoForPlayback(job: Job<VideoProcessJob>): Promise<void> {
     const key = job.data.key;
-    const sourceStream = await this.videoS3Service.getObjectStream(key);
-    const uploadId = await this.videoS3Service.createMultipartUpload(key, 'video/mp4');
-    const ffmpegProcess = spawn(ffmpegStatic as string, [
-      '-hide_banner',
-      '-i',
-      'pipe:0',
-      '-c',
-      'copy',
-      '-movflags',
-      'frag_keyframe+default_base_moof+empty_moov',
-      '-f',
-      'mp4',
-      'pipe:1',
-    ], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-optimize-'));
+    const sourcePath = await this.videoS3Service.downloadRangeToTempFile(key, undefined, tempDir, '.mp4');
+    const outputPath = join(tempDir, 'video_faststart.mp4');
 
-    let stderr = '';
-    const stderrLimit = 256 * 1024;
-    ffmpegProcess.stderr.setEncoding('utf8');
-    ffmpegProcess.stderr.on('data', (chunk: string) => {
-      stderr = (stderr + chunk).slice(-stderrLimit);
-    });
+    try {
+      this.logger.log(`Playback optimization step: remuxing ${key} with faststart`);
+      await this.execFileP(ffmpegStatic as string, [
+        '-hide_banner',
+        '-y',
+        '-i',
+        sourcePath,
+        '-map',
+        '0',
+        '-c',
+        'copy',
+        '-movflags',
+        '+faststart',
+        outputPath,
+      ]);
 
-    const exitPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-      ffmpegProcess.once('error', reject);
-      ffmpegProcess.once('close', (code, signal) => resolve({ code, signal }));
-    });
-
-    const killFfmpeg = () => {
-      if (!ffmpegProcess.killed) {
-        ffmpegProcess.kill('SIGKILL');
+      const outputStat = await stat(outputPath);
+      if (outputStat.size === 0) {
+        throw new Error(`ffmpeg faststart remux produced empty output for ${key}`);
       }
-    };
-    const inputPromise = pipeline(sourceStream, ffmpegProcess.stdin).catch((err) => {
-      if ((err as NodeJS.ErrnoException).code !== 'EPIPE') {
-        killFfmpeg();
+
+      const uploadId = await this.videoS3Service.createMultipartUpload(key, 'video/mp4');
+      try {
+        const completedParts = await this.uploadMultipartStream(key, uploadId, createReadStream(outputPath));
+        if (completedParts.length === 0) {
+          throw new Error(`Faststart upload produced no parts for ${key}`);
+        }
+        await this.videoS3Service.completeMultipartUpload(key, uploadId, completedParts);
+      } catch (err) {
+        await this.videoS3Service.abortMultipartUpload(key, uploadId).catch((abortErr) => {
+          this.logger.error(`Failed to abort multipart upload for ${key}: ${this.formatError(abortErr)}`);
+        });
+        throw err;
       }
-      throw err;
-    });
-    const uploadPromise = this.uploadFragmentedOutput(key, uploadId, ffmpegProcess.stdout).catch((err) => {
-      killFfmpeg();
-      throw err;
-    });
-    const results = await Promise.allSettled([
-      exitPromise,
-      uploadPromise,
-      inputPromise,
-    ]);
 
-    const exitResult = results[0];
-    const uploadResult = results[1];
-    const inputResult = results[2];
-
-    const abortMultipartUpload = async () => {
-      await this.videoS3Service.abortMultipartUpload(key, uploadId).catch((err) => {
-        this.logger.error(`Failed to abort multipart upload for ${key}: ${this.formatError(err)}`);
-      });
-    };
-
-    if (exitResult.status === 'rejected') {
-      await abortMultipartUpload();
-      throw new Error(`Failed to start ffmpeg fragmentation for ${key}: ${this.formatError(exitResult.reason)}`);
+      this.logger.log(`Faststart video replaced original object for ${key} (${outputStat.size} bytes)`);
+    } catch (err) {
+      throw new Error(`Failed to optimize video for browser playback for ${key}: ${this.formatError(err)}`);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
     }
-
-    const { code, signal } = exitResult.value;
-
-    if (code !== 0) {
-      await abortMultipartUpload();
-      this.logger.error(
-        `Fragmentation ffmpeg failed for ${key} with code ${code ?? 'null'} signal ${signal ?? 'none'}: ${stderr.trim()}`,
-      );
-      throw new Error(`ffmpeg fragmentation failed for ${key}`);
-    }
-
-    if (uploadResult.status === 'rejected') {
-      await abortMultipartUpload();
-      throw new Error(`Failed to upload fragmented output for ${key}: ${this.formatError(uploadResult.reason)}`);
-    }
-
-    if (inputResult.status === 'rejected') {
-      await abortMultipartUpload();
-      throw new Error(`Failed to stream source video into ffmpeg for ${key}: ${this.formatError(inputResult.reason)}`);
-    }
-
-    const completedParts = uploadResult.value;
-
-    if (completedParts.length === 0) {
-      await abortMultipartUpload();
-      throw new Error(`ffmpeg fragmentation produced no output for ${key}`);
-    }
-
-    await this.videoS3Service.completeMultipartUpload(key, uploadId, completedParts);
-    this.logger.log(`Fragmented video replaced original object for ${key}`);
   }
 
-  private async uploadFragmentedOutput(
+  private async uploadMultipartStream(
     key: string,
     uploadId: string,
     output: Readable,
