@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { CompletedPart } from '@aws-sdk/client-s3';
 import { Job } from 'bullmq';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
@@ -21,7 +22,18 @@ export class VideoProcessor {
   private webpSupported?: boolean;
   private execFileP = promisify(execFile);
 
-  constructor(private readonly videoS3Service: VideoS3Service) {}
+  private readonly previewStatusBaseUrl: string;
+  private readonly previewStatusPath = '/uploads/bulk/preview-status';
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly videoS3Service: VideoS3Service,
+  ) {
+    this.previewStatusBaseUrl = this.configService.get(
+      'MAIN_BACKEND_URL',
+      'https://prod.fotosfolio.com',
+    );
+  }
 
   async process(job: Job<VideoProcessJob>): Promise<void> {
     this.logger.log(
@@ -38,6 +50,8 @@ export class VideoProcessor {
     this.logger.log(`Step 3/4: optimizing video for browser playback for ${job.data.key}`);
     await this.optimizeVideoForPlayback(job);
     await job.updateProgress(90);
+
+    await this.notifyPreviewStatus([job.data.key]);
 
     this.logger.log(`Step 4/4: marking ${job.data.key} as complete`);
     await job.updateProgress(100);
@@ -495,5 +509,78 @@ export class VideoProcessor {
 
   private formatError(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
+  }
+
+  /**
+   * PATCH /uploads/bulk/preview-status on the main backend after a successful
+   * video optimisation.  Non-fatal: a failure is logged but never rethrows so
+   * the BullMQ job is still marked as completed.
+   */
+  private async notifyPreviewStatus(keys: string[]): Promise<void> {
+    const fileKeys = keys.map((k) => this.stripToFileKey(k));
+
+    try {
+      const response = await fetch(
+        `${this.previewStatusBaseUrl}${this.previewStatusPath}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ fileKeys }),
+        },
+      );
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        this.logger.warn(
+          `Preview status update responded with ${response.status} for keys [${fileKeys.join(', ')}]: ${text}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `✅ Preview status updated for keys: [${fileKeys.join(', ')}]`,
+      );
+    } catch (err) {
+      // Non-fatal — the video is already optimised; don't fail the job.
+      this.logger.error(
+        `Failed to update preview status for keys [${fileKeys.join(', ')}]: ${this.formatError(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Returns a bare S3 object key by stripping the domain, bucket prefix, and
+   * query parameters from whatever value arrives in the job.
+   *
+   * Examples:
+   *   'Original/abc/video.mp4'                              → 'Original/abc/video.mp4'
+   *   'https://cdn.example.com/my-bucket/Original/a.mp4'   → 'Original/a.mp4'
+   *   'https://s3.amazonaws.com/bucket/k.mp4?X-Amz-Sig=…' → 'k.mp4'
+   */
+  private stripToFileKey(keyOrUrl: string): string {
+    if (!keyOrUrl.startsWith('http://') && !keyOrUrl.startsWith('https://')) {
+      // Already a bare key — strip any accidental query string.
+      return keyOrUrl.split('?')[0];
+    }
+
+    try {
+      const url = new URL(keyOrUrl);
+      // pathname begins with '/' then optionally a bucket segment for path-style URLs.
+      const segments = url.pathname.replace(/^\//, '').split('/');
+
+      // If the leading segment is the S3 bucket name (not a known key prefix),
+      // remove it so only the object key remains.
+      const knownKeyPrefixes = ['Original', 'Preview', 'LowResolution', 'Thumbnail'];
+      if (segments.length > 1 && !knownKeyPrefixes.includes(segments[0])) {
+        segments.shift();
+      }
+
+      return segments.join('/');
+    } catch {
+      // URL parsing failed — treat as a bare key.
+      return keyOrUrl.split('?')[0];
+    }
   }
 }
