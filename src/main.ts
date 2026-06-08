@@ -43,6 +43,10 @@ async function bootstrap() {
   const logger = app.get(AppLoggerService);
 
   app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.originalUrl === '/api/health' || req.url === '/api/health') {
+      return next();
+    }
+
     const startTime = Date.now();
 
     logger.log({
