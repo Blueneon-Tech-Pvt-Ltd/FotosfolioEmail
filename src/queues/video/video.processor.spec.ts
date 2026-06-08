@@ -3,7 +3,8 @@ import { VideoProcessor } from './video.processor';
 describe('VideoProcessor', () => {
   describe('buildFaststartRemuxArgs', () => {
     it('maps only browser-playable streams when remuxing MOV files to MP4', () => {
-      const processor = new VideoProcessor({} as any);
+      const mockConfigService = { get: (_key: string, def: string) => def } as any;
+      const processor = new VideoProcessor(mockConfigService, {} as any);
 
       const args = processor['buildFaststartRemuxArgs']('/tmp/input.mov', '/tmp/output.mp4');
 
