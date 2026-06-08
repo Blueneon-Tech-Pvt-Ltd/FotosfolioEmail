@@ -66,18 +66,40 @@ export class VideoProcessor {
   private readonly MOOV_SCAN_BYTES = 10 * 1024 * 1024;
   private readonly MULTIPART_PART_SIZE = 8 * 1024 * 1024;
 
+  /**
+   * Container formats that store the moov/index atom at the END of the file by default.
+   * A partial head download of these formats is unreadable by ffmpeg, so we skip
+   * straight to a full-file download when generating thumbnails.
+   */
+  private readonly MOOV_AT_END_FORMATS = new Set(['.mov', '.m4v', '.qt']);
+
   private async generateThumbnail(job: Job<VideoProcessJob>): Promise<void> {
-    this.logger.log(`Thumbnail step: downloading first ${this.THUMBNAIL_HEAD_BYTES / 1024 / 1024}MB for ${job.data.key}`);
+    // Extract extension from the S3 key so ffmpeg can detect the container format.
+    // e.g. "Original/.../C2632.MP4" → ".mp4"
+    const keyExtMatch = job.data.key.match(/(\.[^./]+)$/);
+    const keyExt = keyExtMatch ? keyExtMatch[1].toLowerCase() : '.mp4';
+
+    // .mov / .m4v / .qt files store their moov atom at the END of the file by default.
+    // Feeding ffmpeg a truncated head of these formats always fails with
+    // "Invalid data found when processing input" — skip straight to a full-file
+    // download so we don't waste 6 ffmpeg invocations before the fallback kicks in.
+    const moovAtEnd = this.MOOV_AT_END_FORMATS.has(keyExt);
+    const headBytes = moovAtEnd ? undefined : this.THUMBNAIL_HEAD_BYTES;
+
+    if (moovAtEnd) {
+      this.logger.log(
+        `Thumbnail step: ${keyExt} stores moov at end — downloading full file for ${job.data.key}`,
+      );
+    } else {
+      this.logger.log(
+        `Thumbnail step: downloading first ${this.THUMBNAIL_HEAD_BYTES / 1024 / 1024}MB for ${job.data.key}`,
+      );
+    }
 
     // We purposely avoid passing an HTTPS URL to ffmpeg. Static ffmpeg binaries crash
     // (SIGSEGV) on many Linux environments due to DNS resolution differences between
     // the static musl/glibc resolver inside ffmpeg and the system resolver used by Node.
-    // Instead, we fetch only the first 30MB via Node's AWS SDK and write to a temp file.
-    // Extract extension from the S3 key so ffmpeg can detect the container format.
-    // e.g. "Original/.../C2632.MP4" → ".MP4"
-    const keyExtMatch = job.data.key.match(/(\.[^./]+)$/);
-    const keyExt = keyExtMatch ? keyExtMatch[1].toLowerCase() : '.mp4';
-
+    // Instead, we fetch the bytes via Node's AWS SDK and write to a temp file.
     const tempDir = await mkdtemp(join(tmpdir(), 'fotosfolio-video-thumb-'));
     let sourcePath: string | undefined;
     let thumbnailBuffer: Buffer;
@@ -86,13 +108,13 @@ export class VideoProcessor {
     try {
       sourcePath = await this.videoS3Service.downloadRangeToTempFile(
         job.data.key,
-        this.THUMBNAIL_HEAD_BYTES,
+        headBytes,
         tempDir,
         keyExt,
       );
     } catch (err: any) {
       this.logger.warn(
-        `Failed to download video head for thumbnail for ${job.data.key}: ${this.formatError(err)}. Uploading fallback thumbnail.`,
+        `Failed to download video${moovAtEnd ? '' : ' head'} for thumbnail for ${job.data.key}: ${this.formatError(err)}. Uploading fallback thumbnail.`,
       );
       ({ buffer: thumbnailBuffer, ext, contentType } = await this.createFallbackThumbnail(tempDir));
     }
@@ -103,24 +125,34 @@ export class VideoProcessor {
         try {
           ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
         } catch (err: any) {
-          this.logger.warn(
-            `Thumbnail capture failed with partial file for ${job.data.key}: ${this.formatError(err)}. Retrying with full file.`,
-          );
-          await rm(sourcePath, { force: true }).catch(() => {});
-          sourcePath = await this.videoS3Service.downloadRangeToTempFile(
-            job.data.key,
-            undefined,
-            tempDir,
-            keyExt,
-          );
-
-          try {
-            ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
-          } catch (fullFileErr) {
+          if (moovAtEnd) {
+            // We already downloaded the full file — no point retrying; go to fallback.
             this.logger.warn(
-              `Thumbnail capture failed with full file for ${job.data.key}: ${this.formatError(fullFileErr)}. Uploading fallback thumbnail.`,
+              `Thumbnail capture failed for full ${keyExt} file for ${job.data.key}: ${this.formatError(err)}. Uploading fallback thumbnail.`,
             );
             ({ buffer: thumbnailBuffer, ext, contentType } = await this.createFallbackThumbnail(tempDir));
+          } else {
+            // Partial file was unreadable (e.g. moov not in first ${headBytes} bytes).
+            // Retry with the full file before giving up.
+            this.logger.warn(
+              `Thumbnail capture failed with partial file for ${job.data.key}: ${this.formatError(err)}. Retrying with full file.`,
+            );
+            await rm(sourcePath, { force: true }).catch(() => {});
+            sourcePath = await this.videoS3Service.downloadRangeToTempFile(
+              job.data.key,
+              undefined,
+              tempDir,
+              keyExt,
+            );
+
+            try {
+              ({ buffer: thumbnailBuffer, ext, contentType } = await this.captureThumbnail(sourcePath, tempDir));
+            } catch (fullFileErr) {
+              this.logger.warn(
+                `Thumbnail capture failed with full file for ${job.data.key}: ${this.formatError(fullFileErr)}. Uploading fallback thumbnail.`,
+              );
+              ({ buffer: thumbnailBuffer, ext, contentType } = await this.createFallbackThumbnail(tempDir));
+            }
           }
         }
       }
@@ -318,6 +350,18 @@ export class VideoProcessor {
   private async captureThumbnail(videoPath: string, tempDir: string): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
     this.logger.log('Starting ffmpeg thumbnail capture');
 
+    // Fast-fail: probe the file before running up to 6 ffmpeg thumbnail attempts.
+    // If ffmpeg cannot open the container at all (e.g. truncated file, moov atom
+    // missing from a partial .mov download), every attempt would fail with
+    // "Invalid data found when processing input". Detecting this upfront avoids
+    // the wasted work and lets the caller fall back to a full-file download sooner.
+    const probeable = await this.canProbeFile(videoPath);
+    if (!probeable) {
+      throw new Error(
+        `ffmpeg cannot probe ${videoPath}: file is likely truncated or has its moov/index atom at the end`,
+      );
+    }
+
     const useWebp = await this.supportsWebp();
     const attempts = [
       ...(useWebp ? [{ ext: '.webp', contentType: 'image/webp', codec: 'libwebp', format: 'webp' }] : []),
@@ -365,6 +409,27 @@ export class VideoProcessor {
     }
 
     throw new Error(`Failed to capture thumbnail after all attempts: ${this.formatError(lastErr)}`);
+  }
+
+  /**
+   * Returns true if ffmpeg can open and probe the given file.
+   * Used as a fast-fail guard before running multiple thumbnail attempts on a
+   * file that may be unreadable (e.g. a truncated partial download).
+   */
+  private async canProbeFile(videoPath: string): Promise<boolean> {
+    try {
+      // `-t 0` + null muxer: reads just enough to parse the container headers.
+      await this.execFileP(ffmpegStatic as string, [
+        '-v', 'error',
+        '-i', videoPath,
+        '-t', '0',
+        '-f', 'null',
+        '-',
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async captureThumbnailAttempt(
