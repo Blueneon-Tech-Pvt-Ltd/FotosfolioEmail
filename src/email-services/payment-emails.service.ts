@@ -5,7 +5,6 @@ import { EmailData, EmailCategory, EmailType } from '../types/email-types';
 
 @Injectable()
 export class PaymentEmailsService extends BaseEmailService {
-  
   /**
    * Build PAYMENT_SUCCESS email
    */
@@ -271,7 +270,11 @@ The amount will be credited to your original payment method within 5-10 business
   /**
    * Build PAYMENT_SUCCESS email (alternative method name)
    */
-  async buildPaymentSuccessfulEmail(to: string, userName: string, planName: string): Promise<EmailData> {
+  async buildPaymentSuccessfulEmail(
+    to: string,
+    userName: string,
+    planName: string,
+  ): Promise<EmailData> {
     const subject = 'Payment Received for Your Subscription';
     const html = `
     <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f3f3f3;padding:40px 0;">
@@ -424,7 +427,11 @@ The amount will be credited to your original payment method within 5-10 business
   /**
    * Build PAYMENT_REJECTION email
    */
-  async buildPaymentRejectionEmail(to: string, userName: string, planName: string): Promise<EmailData> {
+  async buildPaymentRejectionEmail(
+    to: string,
+    userName: string,
+    planName: string,
+  ): Promise<EmailData> {
     const subject = 'Your Payment Could Not Be Completed';
 
     const text = `Hi ${userName},

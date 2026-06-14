@@ -4,7 +4,7 @@ import pino, { Logger, LoggerOptions } from 'pino';
 
 @Injectable()
 export class AppLoggerService implements LoggerService {
-  private pino:Logger;
+  private pino: Logger;
 
   constructor(@Optional() private readonly configService?: ConfigService) {
     const nodeEnv = process.env.NODE_ENV || 'development';

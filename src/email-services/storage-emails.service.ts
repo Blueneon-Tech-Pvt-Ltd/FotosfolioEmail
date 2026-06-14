@@ -5,7 +5,6 @@ import { AddonExpiryEmailDto } from '../cron-jobs/dto/addonexpiry.dto';
 
 @Injectable()
 export class StorageEmailsService extends BaseEmailService {
-  
   /**
    * Build STORAGE_WARNING email (80% full)
    */
@@ -133,15 +132,15 @@ export class StorageEmailsService extends BaseEmailService {
       type: EmailType.STORAGE_WARNING,
     };
   }
-  
+
   /**
    * Build STORAGE_FULL email (100% full)
    */
   async buildStorageFull(payload: any): Promise<EmailData> {
     const { to, userName, storageLimit } = payload;
-    
+
     const subject = 'Storage Full: Immediate Action Required';
-    
+
     const html = `
     <div style="background-color:#f4f4f7;padding:40px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 5px 15px rgba(0,0,0,0.05);">
@@ -253,9 +252,9 @@ export class StorageEmailsService extends BaseEmailService {
 
       </div>
     </div>`;
-    
+
     const text = `Hi ${userName},\n\nYour storage is completely full (${storageLimit} GB). Upgrade your plan or delete files to continue uploading.`;
-    
+
     return {
       to,
       subject,
@@ -265,13 +264,13 @@ export class StorageEmailsService extends BaseEmailService {
       type: EmailType.STORAGE_FULL,
     };
   }
-  
+
   /**
    * Build ADDON_EXPIRY email (legacy)
    */
   async buildAddonExpiry(payload: any): Promise<EmailData> {
     const contact: AddonExpiryEmailDto = payload;
-    
+
     // Validate required fields
     if (!contact.userEmail) {
       throw new Error('Missing required field: userEmail');
@@ -279,7 +278,10 @@ export class StorageEmailsService extends BaseEmailService {
     if (contact.addonLimit === undefined || contact.addonLimit === null) {
       throw new Error('Missing required field: addonLimit');
     }
-    if (contact.newStorageLimit === undefined || contact.newStorageLimit === null) {
+    if (
+      contact.newStorageLimit === undefined ||
+      contact.newStorageLimit === null
+    ) {
       throw new Error('Missing required field: newStorageLimit');
     }
     if (contact.storageUsed === undefined || contact.storageUsed === null) {
@@ -288,7 +290,7 @@ export class StorageEmailsService extends BaseEmailService {
     if (!contact.renewLink) {
       throw new Error('Missing required field: renewLink');
     }
-    
+
     const subject = `Your Addon Storage of ${contact.addonLimit} GB Has Expired`;
     const exceedsLimit =
       Number(contact.storageUsed) > Number(contact.newStorageLimit);
@@ -451,12 +453,15 @@ export class StorageEmailsService extends BaseEmailService {
    */
   buildAddonFinalGrace(payload: any): EmailData {
     const contact = payload;
-    
+
     // Validate required fields
     if (!contact.userEmail) {
       throw new Error('Missing required field: userEmail');
     }
-    if (contact.graceDaysRemaining === undefined || contact.graceDaysRemaining === null) {
+    if (
+      contact.graceDaysRemaining === undefined ||
+      contact.graceDaysRemaining === null
+    ) {
       throw new Error('Missing required field: graceDaysRemaining');
     }
     if (contact.storageUsed === undefined || contact.storageUsed === null) {
@@ -468,8 +473,8 @@ export class StorageEmailsService extends BaseEmailService {
     if (!contact.deleteLink) {
       throw new Error('Missing required field: deleteLink');
     }
-    
-   const subject = `Final Reminder: ${contact.graceDaysRemaining} Day${contact.graceDaysRemaining > 1 ? 's' : ''} Remaining Before Data Deletion`;
+
+    const subject = `Final Reminder: ${contact.graceDaysRemaining} Day${contact.graceDaysRemaining > 1 ? 's' : ''} Remaining Before Data Deletion`;
 
     const html = `
     <div style="background-color:#f4f4f7;padding:40px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">

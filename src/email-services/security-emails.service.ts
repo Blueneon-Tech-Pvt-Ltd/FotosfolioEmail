@@ -4,16 +4,16 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class SecurityEmailsService extends BaseEmailService {
-  
   async buildLoginNotificationEmail(
     to: string,
     userName: string,
     loginTime: Date | string,
-    ipAddress: string
+    ipAddress: string,
   ): Promise<EmailData> {
     const subject = 'New Login to Your Fotosfolio Account';
     // Handle both Date object and string (string comes from queue serialization)
-    const formattedDate = typeof loginTime === 'string' ? loginTime : loginTime.toISOString();
+    const formattedDate =
+      typeof loginTime === 'string' ? loginTime : loginTime.toISOString();
 
     const text = `Hi ${userName},
 
@@ -274,7 +274,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Two-Factor Authentication Enabled`;
     const text = `Two-factor authentication has been enabled on your Fotosfolio account.
@@ -415,7 +415,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Two-Factor Authentication Disabled`;
     const text = `Two-factor authentication has been disabled on your Fotosfolio account.
@@ -557,7 +557,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Passkey Added to Your Account`;
     const text = `A new passkey has been added to your Fotosfolio account.
@@ -704,7 +704,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Passkey Removed from Your Account`;
     const text = `A passkey has been removed from your Fotosfolio account.
@@ -850,7 +850,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Security Questions Configured`;
     const text = `Security questions have been set up on your Fotosfolio account.
@@ -991,7 +991,7 @@ If you didn't authorize this login, please reset your password immediately.
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = `Security Questions Removed`;
     const text = `Security questions have been removed from your Fotosfolio account.

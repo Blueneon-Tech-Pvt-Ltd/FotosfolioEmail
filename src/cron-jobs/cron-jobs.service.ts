@@ -15,7 +15,10 @@ export class CronJobsService implements OnModuleInit {
     private readonly workerPool: WorkerPoolService,
   ) {
     // Get main backend URL from config
-    this.mainBackendUrl = this.configService.get('MAIN_BACKEND_URL', 'https://prod.fotosfolio.com');
+    this.mainBackendUrl = this.configService.get(
+      'MAIN_BACKEND_URL',
+      'https://prod.fotosfolio.com',
+    );
     this.logger.log(`🔗 Main Backend URL: ${this.mainBackendUrl}`);
   }
 
@@ -38,7 +41,9 @@ export class CronJobsService implements OnModuleInit {
     });
 
     this.logger.log('✅ All cron jobs registered successfully');
-    this.logger.log('  - 00:00 (Midnight): Expired subscriptions, storage, grace periods');
+    this.logger.log(
+      '  - 00:00 (Midnight): Expired subscriptions, storage, grace periods',
+    );
     this.logger.log('  - 09:00 (9 AM): Subscription expiration reminders');
     this.logger.log('  - 23:59 (11:59 PM): Storage tracking, project cleanup');
   }
@@ -48,7 +53,9 @@ export class CronJobsService implements OnModuleInit {
    */
   async runMidnightTasks() {
     const startTime = new Date();
-    this.logger.log(`[Cron] Starting midnight tasks at ${startTime.toISOString()}`);
+    this.logger.log(
+      `[Cron] Starting midnight tasks at ${startTime.toISOString()}`,
+    );
 
     const results = {
       expiredSubscriptions: { success: false, message: '' },
@@ -63,7 +70,10 @@ export class CronJobsService implements OnModuleInit {
         const result = await this.sendExpiredEmails();
         results.expiredSubscriptions = result;
       } catch (error: any) {
-        results.expiredSubscriptions = { success: false, message: error.message };
+        results.expiredSubscriptions = {
+          success: false,
+          message: error.message,
+        };
       }
 
       // 2. Expire addon storages
@@ -92,11 +102,21 @@ export class CronJobsService implements OnModuleInit {
 
       const endTime = new Date();
       const duration = (endTime.getTime() - startTime.getTime()) / 1000;
-      this.logger.log(`[Cron] ✅ Midnight tasks completed. Duration: ${duration}s`);
+      this.logger.log(
+        `[Cron] ✅ Midnight tasks completed. Duration: ${duration}s`,
+      );
 
-      return { success: true, duration: `${duration}s`, timestamp: endTime.toISOString(), results };
+      return {
+        success: true,
+        duration: `${duration}s`,
+        timestamp: endTime.toISOString(),
+        results,
+      };
     } catch (error) {
-      this.logger.error('[Cron] ❌ Failed midnight tasks', error.stack || error);
+      this.logger.error(
+        '[Cron] ❌ Failed midnight tasks',
+        error.stack || error,
+      );
       throw error;
     }
   }
@@ -109,11 +129,18 @@ export class CronJobsService implements OnModuleInit {
 
     try {
       const result = await this.sendExpirationEmails();
-      
+
       this.logger.log('[Cron] ✅ Subscription reminder tasks completed');
-      return { success: result.success, timestamp: new Date().toISOString(), data: result };
+      return {
+        success: result.success,
+        timestamp: new Date().toISOString(),
+        data: result,
+      };
     } catch (error) {
-      this.logger.error('[Cron] ❌ Failed subscription reminder tasks', error.stack || error);
+      this.logger.error(
+        '[Cron] ❌ Failed subscription reminder tasks',
+        error.stack || error,
+      );
       throw error;
     }
   }
@@ -145,7 +172,10 @@ export class CronJobsService implements OnModuleInit {
         const result = await this.cleanupExpiredReservations();
         results.cleanupReservations = result;
       } catch (error: any) {
-        results.cleanupReservations = { success: false, message: error.message };
+        results.cleanupReservations = {
+          success: false,
+          message: error.message,
+        };
       }
 
       // 3. Archive expired projects
@@ -181,11 +211,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async sendExpirationEmails() {
     this.logger.log('[Cron] Sending subscription expiration emails');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/subscription/send-expiration-emails', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/subscription/send-expiration-emails',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Subscription expiration emails sent');
-      return { success: true, message: 'Subscription expiration emails sent', data: result };
+      return {
+        success: true,
+        message: 'Subscription expiration emails sent',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to send expiration emails', error);
       return { success: false, message: error.message };
@@ -197,11 +234,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async sendExpiredEmails() {
     this.logger.log('[Cron] Sending expired subscription emails');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/subscription/send-expired-emails', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/subscription/send-expired-emails',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Expired subscription emails sent');
-      return { success: true, message: 'Expired subscription emails sent', data: result };
+      return {
+        success: true,
+        message: 'Expired subscription emails sent',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to send expired emails', error);
       return { success: false, message: error.message };
@@ -213,13 +257,23 @@ export class CronJobsService implements OnModuleInit {
    */
   async markExpiredAsEnded() {
     this.logger.log('[Cron] Marking expired subscriptions as ended');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/subscription/mark-expired-as-ended', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/subscription/mark-expired-as-ended',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Marked expired subscriptions as ended');
-      return { success: true, message: 'Marked expired subscriptions as ended', data: result };
+      return {
+        success: true,
+        message: 'Marked expired subscriptions as ended',
+        data: result,
+      };
     } catch (error: any) {
-      this.logger.error('[Cron] ❌ Failed to mark expired subscriptions', error);
+      this.logger.error(
+        '[Cron] ❌ Failed to mark expired subscriptions',
+        error,
+      );
       return { success: false, message: error.message };
     }
   }
@@ -229,9 +283,12 @@ export class CronJobsService implements OnModuleInit {
    */
   async expireAddonStorages() {
     this.logger.log('[Cron] Expiring addon storages');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/storage/expire-addon-storages', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/storage/expire-addon-storages',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Addon storages expired');
       return { success: true, message: 'Addon storages expired', data: result };
     } catch (error: any) {
@@ -245,13 +302,23 @@ export class CronJobsService implements OnModuleInit {
    */
   async sendGracePeriodNotifications() {
     this.logger.log('[Cron] Sending grace period notifications');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/storage/send-grace-period-notifications', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/storage/send-grace-period-notifications',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Grace period notifications sent');
-      return { success: true, message: 'Grace period notifications sent', data: result };
+      return {
+        success: true,
+        message: 'Grace period notifications sent',
+        data: result,
+      };
     } catch (error: any) {
-      this.logger.error('[Cron] ❌ Failed to send grace period notifications', error);
+      this.logger.error(
+        '[Cron] ❌ Failed to send grace period notifications',
+        error,
+      );
       return { success: false, message: error.message };
     }
   }
@@ -261,11 +328,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async setTotalUsage() {
     this.logger.log('[Cron] Setting total storage usage');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/storage/set-total-usage', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/storage/set-total-usage',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Total storage usage set');
-      return { success: true, message: 'Total storage usage set', data: result };
+      return {
+        success: true,
+        message: 'Total storage usage set',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to set storage usage', error);
       return { success: false, message: error.message };
@@ -277,11 +351,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async cleanupExpiredReservations() {
     this.logger.log('[Cron] Cleaning up expired reservations');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/storage/cleanup-expired-reservations', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/storage/cleanup-expired-reservations',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Expired reservations cleaned up');
-      return { success: true, message: 'Expired reservations cleaned up', data: result };
+      return {
+        success: true,
+        message: 'Expired reservations cleaned up',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to cleanup reservations', error);
       return { success: false, message: error.message };
@@ -293,11 +374,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async archiveExpired() {
     this.logger.log('[Cron] Archiving expired projects');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/project/archive-expired', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/project/archive-expired',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Expired projects archived');
-      return { success: true, message: 'Expired projects archived', data: result };
+      return {
+        success: true,
+        message: 'Expired projects archived',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to archive projects', error);
       return { success: false, message: error.message };
@@ -309,11 +397,18 @@ export class CronJobsService implements OnModuleInit {
    */
   async deleteExpired() {
     this.logger.log('[Cron] Deleting expired projects');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/project/delete-expired', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/project/delete-expired',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Expired projects deleted');
-      return { success: true, message: 'Expired projects deleted', data: result };
+      return {
+        success: true,
+        message: 'Expired projects deleted',
+        data: result,
+      };
     } catch (error: any) {
       this.logger.error('[Cron] ❌ Failed to delete expired projects', error);
       return { success: false, message: error.message };
@@ -325,13 +420,23 @@ export class CronJobsService implements OnModuleInit {
    */
   async deleteExpiredArchived() {
     this.logger.log('[Cron] Deleting expired archived projects');
-    
+
     try {
-      const result = await this.callBackendEndpoint('/cron/project/delete-expired-archived', 'POST');
+      const result = await this.callBackendEndpoint(
+        '/cron/project/delete-expired-archived',
+        'POST',
+      );
       this.logger.log('[Cron] ✅ Expired archived projects deleted');
-      return { success: true, message: 'Expired archived projects deleted', data: result };
+      return {
+        success: true,
+        message: 'Expired archived projects deleted',
+        data: result,
+      };
     } catch (error: any) {
-      this.logger.error('[Cron] ❌ Failed to delete expired archived projects', error);
+      this.logger.error(
+        '[Cron] ❌ Failed to delete expired archived projects',
+        error,
+      );
       return { success: false, message: error.message };
     }
   }
@@ -341,10 +446,10 @@ export class CronJobsService implements OnModuleInit {
    */
   private async getBackendData(endpoint: string): Promise<any[]> {
     const url = `${this.mainBackendUrl}${endpoint}`;
-    
+
     try {
       this.logger.log(`[API] Fetching data from GET ${url}`);
-      
+
       const response = await axios({
         method: 'GET',
         url,
@@ -352,16 +457,20 @@ export class CronJobsService implements OnModuleInit {
       });
 
       const data = response.data?.data || response.data || [];
-      this.logger.log(`[API] ✅ Received ${data.length} items from ${endpoint}`);
+      this.logger.log(
+        `[API] ✅ Received ${data.length} items from ${endpoint}`,
+      );
       return data;
     } catch (error: any) {
       if (error.code === 'ECONNREFUSED') {
         this.logger.warn(`[API] ⚠️ Main backend not available at ${url}`);
         return []; // Return empty array if backend unavailable
       }
-      
+
       if (error.response) {
-        this.logger.error(`[API] ❌ ${endpoint} failed: ${error.response.status} - ${error.response.data?.message || error.message}`);
+        this.logger.error(
+          `[API] ❌ ${endpoint} failed: ${error.response.status} - ${error.response.data?.message || error.message}`,
+        );
         return [];
       }
 
@@ -373,12 +482,15 @@ export class CronJobsService implements OnModuleInit {
   /**
    * Helper method to call main backend API endpoints (POST for actions)
    */
-  private async callBackendEndpoint(endpoint: string, method: 'GET' | 'POST' = 'POST'): Promise<any> {
+  private async callBackendEndpoint(
+    endpoint: string,
+    method: 'GET' | 'POST' = 'POST',
+  ): Promise<any> {
     const url = `${this.mainBackendUrl}${endpoint}`;
-    
+
     try {
       this.logger.log(`[API] Calling ${method} ${url}`);
-      
+
       const response = await axios({
         method,
         url,
@@ -389,16 +501,20 @@ export class CronJobsService implements OnModuleInit {
         this.logger.log(`[API] ✅ ${endpoint} completed successfully`);
         return response.data;
       } else {
-        throw new Error(response.data?.message || 'Backend returned success: false');
+        throw new Error(
+          response.data?.message || 'Backend returned success: false',
+        );
       }
     } catch (error: any) {
       if (error.code === 'ECONNREFUSED') {
         this.logger.warn(`[API] ⚠️ Main backend not available at ${url}`);
         throw new Error('Main backend not available');
       }
-      
+
       if (error.response) {
-        this.logger.error(`[API] ❌ ${endpoint} failed: ${error.response.status} - ${error.response.data?.message || error.message}`);
+        this.logger.error(
+          `[API] ❌ ${endpoint} failed: ${error.response.status} - ${error.response.data?.message || error.message}`,
+        );
         throw new Error(error.response.data?.message || error.message);
       }
 

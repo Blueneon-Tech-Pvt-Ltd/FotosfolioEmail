@@ -1,4 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Post,
+} from '@nestjs/common';
 import { VideoProcessQueue } from '../queues/video/video.queue';
 import { VideoProcessDto } from './dtos/video-process.dto';
 

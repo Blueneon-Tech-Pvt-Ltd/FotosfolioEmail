@@ -9,11 +9,8 @@ import { ProjectEmailsService } from '../email-services/project-emails.service';
 import { StorageEmailsService } from '../email-services/storage-emails.service';
 import { PaymentEmailsService } from '../email-services/payment-emails.service';
 
-
 @Module({
-  imports: [
-    SenderModule, 
-  ],
+  imports: [SenderModule],
   providers: [
     WorkerPoolService,
     BaseEmailService,
@@ -24,6 +21,6 @@ import { PaymentEmailsService } from '../email-services/payment-emails.service';
     PaymentEmailsService,
     StorageEmailsService,
   ],
-  exports: [WorkerPoolService, ],
+  exports: [WorkerPoolService],
 })
 export class WorkersModule {}

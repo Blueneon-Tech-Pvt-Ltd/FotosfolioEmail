@@ -1,4 +1,11 @@
-import { Controller, Post, HttpCode, HttpStatus, Logger, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Body,
+} from '@nestjs/common';
 import { CronJobsService } from './cron-jobs.service';
 import { WorkerPoolService } from '../workersqueue/workerqueue-pool.service';
 import { EmailCategory, EmailType } from '../types/email-types';
@@ -20,7 +27,7 @@ export class CronJobsController {
   @HttpCode(HttpStatus.OK)
   async triggerMidnightTasks() {
     this.logger.log('Manual trigger: Midnight tasks');
-    
+
     try {
       const result = await this.cronJobsService.runMidnightTasks();
       return {
@@ -46,7 +53,7 @@ export class CronJobsController {
   @HttpCode(HttpStatus.OK)
   async triggerReminderTasks() {
     this.logger.log('Manual trigger: Subscription reminders');
-    
+
     try {
       const result = await this.cronJobsService.runSubscriptionReminderTasks();
       return {
@@ -72,7 +79,7 @@ export class CronJobsController {
   @HttpCode(HttpStatus.OK)
   async triggerNightlyStorageTasks() {
     this.logger.log('Manual trigger: Nightly storage tasks');
-    
+
     try {
       const result = await this.cronJobsService.runNightlyTasks();
       return {
@@ -96,39 +103,56 @@ export class CronJobsController {
    */
   @Post('subscription/send-expiration-emails')
   @HttpCode(HttpStatus.OK)
-  async sendSubscriptionExpirationEmails(@Body() body: { subscriptions?: any[]; data?: any[] }) {
+  async sendSubscriptionExpirationEmails(
+    @Body() body: { subscriptions?: any[]; data?: any[] },
+  ) {
     this.logger.log('Received request to send subscription expiration emails');
-    
+
     try {
       const subscriptions = body.subscriptions || body.data || body || [];
-      const dataArray = Array.isArray(subscriptions) ? subscriptions : [subscriptions];
-      this.logger.log(`Processing ${dataArray.length} subscriptions for expiration emails`);
+      const dataArray = Array.isArray(subscriptions)
+        ? subscriptions
+        : [subscriptions];
+      this.logger.log(
+        `Processing ${dataArray.length} subscriptions for expiration emails`,
+      );
 
       let queued = 0;
       for (const subscription of dataArray) {
         try {
           // Transform the subscription data to match email service expectations
           const payload = {
-            to: subscription.email || subscription.userEmail || subscription.user?.email,
-            userName: subscription.userName || subscription.user?.name || 'User',
-            daysRemaining: subscription.daysRemaining || subscription.daysLeft || 0,
+            to:
+              subscription.email ||
+              subscription.userEmail ||
+              subscription.user?.email,
+            userName:
+              subscription.userName || subscription.user?.name || 'User',
+            daysRemaining:
+              subscription.daysRemaining || subscription.daysLeft || 0,
           };
 
-          this.logger.log(`Queueing email for ${payload.to} (${payload.daysRemaining} days remaining)`);
+          this.logger.log(
+            `Queueing email for ${payload.to} (${payload.daysRemaining} days remaining)`,
+          );
 
           await this.workerPool.addJob(
             EmailCategory.SUBSCRIPTION,
             EmailType.SUBSCRIPTION_EXPIRING,
-            payload
+            payload,
           );
           queued++;
         } catch (error: any) {
-          this.logger.error(`Failed to queue email for subscription ${subscription.id}: ${error.message}`);
+          this.logger.error(
+            `Failed to queue email for subscription ${subscription.id}: ${error.message}`,
+          );
         }
       }
 
-      this.logger.log(`✅ Successfully queued ${queued}/${dataArray.length} expiration emails`);
-      
+      this.logger.log(
+        `✅ Successfully queued ${queued}/${dataArray.length} expiration emails`,
+      );
+
       return {
         success: true,
         message: 'Subscription expiration emails queued',
@@ -139,7 +163,10 @@ export class CronJobsController {
         },
       };
     } catch (error: any) {
-      this.logger.error('Failed to process subscription expiration emails', error);
+      this.logger.error(
+        'Failed to process subscription expiration emails',
+        error,
+      );
       return {
         success: false,
         message: error.message,
@@ -153,12 +180,16 @@ export class CronJobsController {
    */
   @Post('subscription/send-expired-emails')
   @HttpCode(HttpStatus.OK)
-  async sendExpiredSubscriptionEmails(@Body() body: { subscriptions?: any[]; data?: any[] }) {
+  async sendExpiredSubscriptionEmails(
+    @Body() body: { subscriptions?: any[]; data?: any[] },
+  ) {
     this.logger.log('Received request to send expired subscription emails');
-    
+
     try {
       const subscriptions = body.subscriptions || body.data || body || [];
-      const dataArray = Array.isArray(subscriptions) ? subscriptions : [subscriptions];
+      const dataArray = Array.isArray(subscriptions)
+        ? subscriptions
+        : [subscriptions];
       this.logger.log(`Processing ${dataArray.length} expired subscriptions`);
 
       let queued = 0;
@@ -166,26 +197,37 @@ export class CronJobsController {
         try {
           // Transform the subscription data to match email service expectations
           const payload = {
-            to: subscription.email || subscription.userEmail || subscription.user?.email,
-            userName: subscription.userName || subscription.user?.name || 'User',
-            graceDaysRemaining: subscription.graceDaysRemaining || subscription.graceDays || 3,
+            to:
+              subscription.email ||
+              subscription.userEmail ||
+              subscription.user?.email,
+            userName:
+              subscription.userName || subscription.user?.name || 'User',
+            graceDaysRemaining:
+              subscription.graceDaysRemaining || subscription.graceDays || 3,
           };
 
-          this.logger.log(`Queueing expired email for ${payload.to} (${payload.graceDaysRemaining} grace days)`);
+          this.logger.log(
+            `Queueing expired email for ${payload.to} (${payload.graceDaysRemaining} grace days)`,
+          );
 
           await this.workerPool.addJob(
             EmailCategory.SUBSCRIPTION,
             EmailType.SUBSCRIPTION_EXPIRED,
-            payload
+            payload,
           );
           queued++;
         } catch (error: any) {
-          this.logger.error(`Failed to queue email for subscription ${subscription.id}: ${error.message}`);
+          this.logger.error(
+            `Failed to queue email for subscription ${subscription.id}: ${error.message}`,
+          );
         }
       }
 
-      this.logger.log(`✅ Successfully queued ${queued}/${dataArray.length} expired emails`);
-      
+      this.logger.log(
+        `✅ Successfully queued ${queued}/${dataArray.length} expired emails`,
+      );
+
       return {
         success: true,
         message: 'Expired subscription emails queued',
@@ -210,13 +252,17 @@ export class CronJobsController {
    */
   @Post('storage/send-grace-period-notifications')
   @HttpCode(HttpStatus.OK)
-  async sendGracePeriodNotifications(@Body() body: { storages?: any[]; data?: any[] }) {
+  async sendGracePeriodNotifications(
+    @Body() body: { storages?: any[]; data?: any[] },
+  ) {
     this.logger.log('Received request to send grace period notifications');
-    
+
     try {
       const storages = body.storages || body.data || body || [];
       const dataArray = Array.isArray(storages) ? storages : [storages];
-      this.logger.log(`Processing ${dataArray.length} storages for grace period notifications`);
+      this.logger.log(
+        `Processing ${dataArray.length} storages for grace period notifications`,
+      );
 
       let queued = 0;
       for (const storage of dataArray) {
@@ -224,30 +270,40 @@ export class CronJobsController {
           // Transform the storage data to match email service expectations
           // buildAddonFinalGrace expects: userEmail, graceDaysRemaining, storageUsed, renewLink, deleteLink
           const payload = {
-            userEmail: storage.email || storage.userEmail || storage.user?.email,
+            userEmail:
+              storage.email || storage.userEmail || storage.user?.email,
             userName: storage.userName || storage.user?.name || 'User',
-            graceDaysRemaining: storage.graceDaysRemaining || storage.graceDays || 3,
+            graceDaysRemaining:
+              storage.graceDaysRemaining || storage.graceDays || 3,
             storageUsed: storage.storageUsed || storage.used || 0,
             storageLimit: storage.storageLimit || storage.limit || 0,
-            renewLink: storage.renewLink || 'https://prod.fotosfolio.com/billing',
-            deleteLink: storage.deleteLink || 'https://prod.fotosfolio.com/storage',
+            renewLink:
+              storage.renewLink || 'https://prod.fotosfolio.com/billing',
+            deleteLink:
+              storage.deleteLink || 'https://prod.fotosfolio.com/storage',
           };
 
-          this.logger.log(`Queueing grace period email for ${payload.userEmail}`);
+          this.logger.log(
+            `Queueing grace period email for ${payload.userEmail}`,
+          );
 
           await this.workerPool.addJob(
             EmailCategory.STORAGE,
             EmailType.ADDON_FINAL_GRACE,
-            payload
+            payload,
           );
           queued++;
         } catch (error: any) {
-          this.logger.error(`Failed to queue grace period email for storage ${storage.id}: ${error.message}`);
+          this.logger.error(
+            `Failed to queue grace period email for storage ${storage.id}: ${error.message}`,
+          );
         }
       }
 
-      this.logger.log(`✅ Successfully queued ${queued}/${dataArray.length} grace period notifications`);
-      
+      this.logger.log(
+        `✅ Successfully queued ${queued}/${dataArray.length} grace period notifications`,
+      );
+
       return {
         success: true,
         message: 'Grace period notifications queued',

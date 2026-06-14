@@ -7,8 +7,11 @@ export class AccountEmailsService extends BaseEmailService {
   private getCurrentYear(): number {
     return new Date().getFullYear();
   }
-  
-  async buildAccountCreatedEmail(to: string, username: string): Promise<EmailData> {
+
+  async buildAccountCreatedEmail(
+    to: string,
+    username: string,
+  ): Promise<EmailData> {
     console.log(`Sending account created email to ${to}`);
     const subject = 'Welcome to Fotosfolio – Your Account is Ready!';
 
@@ -110,7 +113,11 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
-  async buildPasswordResetEmail(to: string, username: string, resetLink: string): Promise<EmailData> {
+  async buildPasswordResetEmail(
+    to: string,
+    username: string,
+    resetLink: string,
+  ): Promise<EmailData> {
     console.log('sdfsdfsdf');
     const subject = 'Reset Your Fotosfolio Password';
 
@@ -212,9 +219,12 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
-  async buildPasswordResetSuccessEmail(to: string, username: string): Promise<EmailData> {
-   const subject = ' Password Reset Successful';
-   const text = `
+  async buildPasswordResetSuccessEmail(
+    to: string,
+    username: string,
+  ): Promise<EmailData> {
+    const subject = ' Password Reset Successful';
+    const text = `
   Password Reset Successful
 
   Hi ${username},
@@ -343,7 +353,11 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
- async buildOtpEmail(to: string, userName: string, otpCode: string): Promise<EmailData> {
+  async buildOtpEmail(
+    to: string,
+    userName: string,
+    otpCode: string,
+  ): Promise<EmailData> {
     const subject = 'Your OTP Code for Secure Access';
     const text = `Dear ${userName},
   We have received a request to verify your email address for your Fotosfolio account.
@@ -449,7 +463,10 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
-  async buildOtpVerifiedEmail(to: string, userName: string): Promise<EmailData> {
+  async buildOtpVerifiedEmail(
+    to: string,
+    userName: string,
+  ): Promise<EmailData> {
     console.log(to, userName);
     const subject = 'Email Verification Completed Successfully';
     const text = `Dear ${userName},
@@ -582,7 +599,10 @@ export class AccountEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
-  async buildKycApprovedEmail(to: string, userName: string): Promise<EmailData> {
+  async buildKycApprovedEmail(
+    to: string,
+    userName: string,
+  ): Promise<EmailData> {
     const subject = 'Your KYC Verification Has Been Approved';
     const text = `Hi ${userName},
 
@@ -699,8 +719,13 @@ The Fotosfolio Team`;
     return { to, subject, text, html };
   }
 
-  async buildKycRejectedEmail(to: string, userName: string, reason?: string): Promise<EmailData> {
-    const rejectionReason = reason?.trim() || 'The submitted documents could not be verified.';
+  async buildKycRejectedEmail(
+    to: string,
+    userName: string,
+    reason?: string,
+  ): Promise<EmailData> {
+    const rejectionReason =
+      reason?.trim() || 'The submitted documents could not be verified.';
     const subject = 'Your KYC Verification Was Rejected';
     const text = `Hi ${userName},
 
@@ -831,7 +856,7 @@ The Fotosfolio Team`;
     device: string,
     location: string,
     ipAddress: string,
-    datetime: Date
+    datetime: Date,
   ): Promise<EmailData> {
     const subject = 'Google Account Disconnected';
     const formattedDate = datetime

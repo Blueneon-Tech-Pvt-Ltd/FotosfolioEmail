@@ -4,7 +4,6 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { AppLoggerService } from './logger/logger.service';
 
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: new AppLoggerService(),
@@ -15,9 +14,9 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true, //
       transform: true, // Transform payloads to DTO instances
-      forbidNonWhitelisted: true, 
+      forbidNonWhitelisted: true,
       transformOptions: {
-        enableImplicitConversion: true, 
+        enableImplicitConversion: true,
       },
     }),
   );
@@ -35,10 +34,10 @@ async function bootstrap() {
 
   // Port configuration
   const port = process.env.PORT || 3002;
-  
+
   // Enable graceful shutdown hooks - ensures NestJS lifecycle hooks are called
   app.enableShutdownHooks();
-  
+
   // Handle termination signals for graceful shutdown
   const logger = app.get(AppLoggerService);
 
@@ -67,7 +66,7 @@ async function bootstrap() {
 
     next();
   });
-  
+
   process.on('SIGTERM', async () => {
     logger.log('SIGTERM signal received - initiating graceful shutdown...');
     await app.close();
@@ -81,9 +80,9 @@ async function bootstrap() {
     logger.log('Application shut down successfully');
     process.exit(0);
   });
-  
+
   await app.listen(port);
-  
+
   console.log(`
   Email Microservice Started           
   Port: ${port}                        

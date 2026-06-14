@@ -4,14 +4,13 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class SubscriptionEmailsService extends BaseEmailService {
-  
   async buildSubscriptionCreatedEmail(
     to: string,
     userName: string,
     planName: string,
     startDate: Date,
     endDate: Date,
-    status: string
+    status: string,
   ): Promise<EmailData> {
     const subject = 'Your Fotosfolio Subscription is Now Active!';
     const text = `Hi ${userName},
@@ -162,7 +161,7 @@ export class SubscriptionEmailsService extends BaseEmailService {
     planName: string,
     startDate: Date,
     endDate: Date,
-    status: string
+    status: string,
   ): Promise<EmailData> {
     const subject = 'Your Fotosfolio Subscription Has Been Renewed!';
     const text = `Hi ${userName},
@@ -307,8 +306,12 @@ export class SubscriptionEmailsService extends BaseEmailService {
     return { to, subject, text, html };
   }
 
-  async buildAccountActivationEmail(to: string, userName: string, planName: string): Promise<EmailData> {
-   const subject = 'Your Account is Now Active! 🎉';
+  async buildAccountActivationEmail(
+    to: string,
+    userName: string,
+    planName: string,
+  ): Promise<EmailData> {
+    const subject = 'Your Account is Now Active! 🎉';
 
     const html = `
     <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#fafafa;padding:40px 0;">
@@ -462,7 +465,7 @@ export class SubscriptionEmailsService extends BaseEmailService {
   async buildSubscriptionExpirationReminderEmail(
     to: string,
     userName: string,
-    daysRemaining: number
+    daysRemaining: number,
   ): Promise<EmailData> {
     const subject = 'Reminder: Your Subscription Will Expire Soon';
 
@@ -624,9 +627,9 @@ export class SubscriptionEmailsService extends BaseEmailService {
   async buildSubscriptionExpiredEmail(
     to: string,
     userName: string,
-    graceDaysRemaining: number
+    graceDaysRemaining: number,
   ): Promise<EmailData> {
-     const subject = 'Your Subscription Has Expired';
+    const subject = 'Your Subscription Has Expired';
 
     const text = `Hi ${userName},
 

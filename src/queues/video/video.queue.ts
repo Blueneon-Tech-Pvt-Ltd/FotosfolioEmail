@@ -20,8 +20,9 @@ export class VideoProcessQueue implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
-    const { connection, prefix, description } =
-      getVideoQueueConnectionConfig(this.configService);
+    const { connection, prefix, description } = getVideoQueueConnectionConfig(
+      this.configService,
+    );
 
     this.queue = new Queue<VideoProcessJob>(VIDEO_PROCESS_QUEUE_NAME, {
       connection,

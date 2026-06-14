@@ -24,8 +24,9 @@ export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    const { connection, prefix, description } =
-      getVideoQueueConnectionConfig(this.configService);
+    const { connection, prefix, description } = getVideoQueueConnectionConfig(
+      this.configService,
+    );
 
     this.worker = new Worker<VideoProcessJob>(
       VIDEO_PROCESS_QUEUE_NAME,
@@ -52,7 +53,10 @@ export class VideoProcessWorker implements OnModuleInit, OnModuleDestroy {
     });
 
     this.worker.on('error', (error) => {
-      this.logger.error(`Video process worker error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Video process worker error: ${error.message}`,
+        error.stack,
+      );
     });
 
     this.worker.on('failed', (job, error) => {

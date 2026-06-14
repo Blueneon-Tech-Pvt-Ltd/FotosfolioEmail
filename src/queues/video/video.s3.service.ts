@@ -33,8 +33,7 @@ export class VideoS3Service {
       throw new Error('S3_BUCKET is not configured');
     }
 
-    const region =
-      this.configService.get<string>('AWS_REGION') ?? 'us-east-1';
+    const region = this.configService.get<string>('AWS_REGION') ?? 'us-east-1';
     const endpoint =
       this.configService.get<string>('S3_ENDPOINT') ??
       this.configService.get<string>('AWS_S3_ENDPOINT');
@@ -43,8 +42,9 @@ export class VideoS3Service {
       'true';
 
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey =
-      this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
     const sessionToken = this.configService.get<string>('AWS_SESSION_TOKEN');
 
     this.client = new S3Client({
@@ -81,10 +81,7 @@ export class VideoS3Service {
     );
   }
 
-  async getPresignedPutUrl(
-    key: string,
-    contentType: string,
-  ): Promise<string> {
+  async getPresignedPutUrl(key: string, contentType: string): Promise<string> {
     return getSignedUrl(
       this.client,
       new PutObjectCommand({
@@ -100,7 +97,11 @@ export class VideoS3Service {
 
   // Download an object range (e.g. last N bytes). If range is omitted, returns full object.
   async getObjectRange(key: string, range?: string): Promise<Buffer> {
-    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: range });
+    const cmd = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Range: range,
+    });
     const res = await this.client.send(cmd);
     const body = res.Body as Readable;
 
@@ -119,7 +120,10 @@ export class VideoS3Service {
     return res.Body as Readable;
   }
 
-  async createMultipartUpload(key: string, contentType: string): Promise<string> {
+  async createMultipartUpload(
+    key: string,
+    contentType: string,
+  ): Promise<string> {
     const res = await this.client.send(
       new CreateMultipartUploadCommand({
         Bucket: this.bucket,
@@ -129,7 +133,9 @@ export class VideoS3Service {
     );
 
     if (!res.UploadId) {
-      throw new Error(`S3 did not return an upload id for multipart upload ${key}`);
+      throw new Error(
+        `S3 did not return an upload id for multipart upload ${key}`,
+      );
     }
 
     this.logger.log(`Started multipart upload for ${key}`);
@@ -153,7 +159,9 @@ export class VideoS3Service {
     );
 
     if (!res.ETag) {
-      throw new Error(`S3 did not return an ETag for ${key} part ${partNumber}`);
+      throw new Error(
+        `S3 did not return an ETag for ${key} part ${partNumber}`,
+      );
     }
 
     return {
@@ -173,12 +181,16 @@ export class VideoS3Service {
         Key: key,
         UploadId: uploadId,
         MultipartUpload: {
-          Parts: parts.sort((a, b) => (a.PartNumber ?? 0) - (b.PartNumber ?? 0)),
+          Parts: parts.sort(
+            (a, b) => (a.PartNumber ?? 0) - (b.PartNumber ?? 0),
+          ),
         },
       }),
     );
 
-    this.logger.log(`Completed multipart upload for ${key} with ${parts.length} parts`);
+    this.logger.log(
+      `Completed multipart upload for ${key} with ${parts.length} parts`,
+    );
   }
 
   async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
@@ -218,7 +230,11 @@ export class VideoS3Service {
     ext: string,
   ): Promise<string> {
     const range = bytes ? `bytes=0-${bytes - 1}` : undefined;
-    const cmd = new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: range });
+    const cmd = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Range: range,
+    });
     const res = await this.client.send(cmd);
     const body = res.Body as Readable;
 
@@ -227,7 +243,9 @@ export class VideoS3Service {
     await pipeline(body, ws);
 
     if (bytes) {
-      this.logger.log(`Downloaded first ${(bytes / 1024 / 1024).toFixed(0)}MB of ${key} to ${outPath}`);
+      this.logger.log(
+        `Downloaded first ${(bytes / 1024 / 1024).toFixed(0)}MB of ${key} to ${outPath}`,
+      );
     } else {
       this.logger.log(`Downloaded full file ${key} to ${outPath}`);
     }
@@ -236,11 +254,18 @@ export class VideoS3Service {
   }
 
   // Upload a buffer to S3 with retries
-  async uploadBuffer(key: string, buffer: Buffer, contentType: string, attempts = 3): Promise<void> {
+  async uploadBuffer(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+    attempts = 3,
+  ): Promise<void> {
     let lastErr: any;
     for (let i = 0; i < attempts; i++) {
       try {
-        this.logger.log(`Uploading ${buffer.length} bytes to ${key} (${contentType})`);
+        this.logger.log(
+          `Uploading ${buffer.length} bytes to ${key} (${contentType})`,
+        );
 
         const cmd = new PutObjectCommand({
           Bucket: this.bucket,
@@ -260,5 +285,4 @@ export class VideoS3Service {
 
     throw lastErr;
   }
-
 }

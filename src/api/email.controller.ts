@@ -228,7 +228,7 @@ export class EmailController {
     @Param('jobId') jobId: string,
   ) {
     const job = await this.workerPool.getJob(category, jobId);
-    
+
     if (!job) {
       return {
         success: false,

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ResendProviderService } from './resend-provider.service';
 import { EmailData } from '../types/email-types';
 
-
 @Injectable()
 export class EmailSenderService {
   private readonly logger = new Logger(EmailSenderService.name);
@@ -49,7 +48,9 @@ export class EmailSenderService {
           `⚠️ Email sent but no ID returned for ${to}. Response: ${JSON.stringify(response)}`,
         );
         if (response.error) {
-          throw new Error(`Resend API error: ${JSON.stringify(response.error)}`);
+          throw new Error(
+            `Resend API error: ${JSON.stringify(response.error)}`,
+          );
         }
       }
 
@@ -100,7 +101,7 @@ export class EmailSenderService {
       while (this.sendQueue.length > 0) {
         const now = Date.now();
         // Remove timestamps older than 1 second
-        this.sendTimestamps = this.sendTimestamps.filter(t => now - t < 1000);
+        this.sendTimestamps = this.sendTimestamps.filter((t) => now - t < 1000);
 
         if (this.sendTimestamps.length < this.maxPerSecond) {
           // Slot available — record timestamp NOW (before releasing) to prevent race conditions
@@ -110,8 +111,12 @@ export class EmailSenderService {
         } else {
           // Wait until the oldest timestamp expires
           const waitTime = 1000 - (now - this.sendTimestamps[0]);
-          this.logger.debug(`⏳ Rate limit: waiting ${waitTime}ms (${this.sendTimestamps.length} emails in last second)`);
-          await new Promise(resolve => setTimeout(resolve, Math.max(waitTime, 50)));
+          this.logger.debug(
+            `⏳ Rate limit: waiting ${waitTime}ms (${this.sendTimestamps.length} emails in last second)`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.max(waitTime, 50)),
+          );
         }
       }
     } finally {
@@ -137,9 +142,7 @@ export class EmailSenderService {
     const successful = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    this.logger.log(
-      `📊 Batch complete: ${successful} sent, ${failed} failed`,
-    );
+    this.logger.log(`📊 Batch complete: ${successful} sent, ${failed} failed`);
 
     if (failed > 0) {
       const errors = results

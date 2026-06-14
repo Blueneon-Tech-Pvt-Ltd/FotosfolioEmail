@@ -21,7 +21,8 @@ export class ResendProviderService implements OnModuleInit {
   async onModuleInit() {
     this.apiKey1 = this.configService.get<string>('resend.apiKey1')!;
     this.apiKey2 = this.configService.get<string>('resend.apiKey2')!;
-    this.dailyLimit = this.configService.get<number>('resend.dailyLimit') || 100;
+    this.dailyLimit =
+      this.configService.get<number>('resend.dailyLimit') || 100;
     this.lastResetDate = new Date().toISOString().slice(0, 10);
 
     // Validate required API keys
@@ -38,7 +39,7 @@ export class ResendProviderService implements OnModuleInit {
    */
   private async getTodaysEmailCount(): Promise<number> {
     const now = Date.now();
-    
+
     // Use cache to avoid excessive API calls (refresh every 5 minutes)
     if (now - this.lastApiFetchTime < this.apiCacheDuration) {
       this.logger.debug(`Using cached count: ${this.emailCountToday}`);
@@ -54,7 +55,7 @@ export class ResendProviderService implements OnModuleInit {
 
     try {
       let hasMore = true;
-      
+
       while (hasMore && pageCount < maxPages) {
         // Build URL with limit and starting_after for pagination
         const params: any = { limit: 100 }; // Max allowed by Resend API
@@ -64,7 +65,7 @@ export class ResendProviderService implements OnModuleInit {
 
         // Wait 500ms between requests to respect rate limits (2 req/sec)
         if (pageCount > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
         const response = await axios.get('https://api.resend.com/emails', {
@@ -77,15 +78,19 @@ export class ResendProviderService implements OnModuleInit {
 
         const emails = response.data.data || [];
         hasMore = response.data.has_more === true;
-        
+
         // Debug: Check if we're getting unique emails
         if (pageCount === 0 && emails.length > 0) {
-          this.logger.debug(`First email ID: ${emails[0]?.id}, created: ${emails[0]?.created_at}`);
+          this.logger.debug(
+            `First email ID: ${emails[0]?.id}, created: ${emails[0]?.created_at}`,
+          );
         }
         if (emails.length > 0) {
-          this.logger.debug(`Last email ID on page: ${emails[emails.length - 1]?.id}`);
+          this.logger.debug(
+            `Last email ID on page: ${emails[emails.length - 1]?.id}`,
+          );
         }
-        
+
         // Filter emails sent today
         const todaysEmails = emails.filter((email: any) => {
           if (!email.created_at) return false;
@@ -95,25 +100,27 @@ export class ResendProviderService implements OnModuleInit {
 
         totalCount += todaysEmails.length;
         pageCount++;
-        
+
         this.logger.log(
           `📄 Page ${pageCount}: ${todaysEmails.length}/${emails.length} from today ` +
-          `(total: ${totalCount}, has_more: ${hasMore})`
+            `(total: ${totalCount}, has_more: ${hasMore})`,
         );
-        
+
         // Get last email ID for next page
         if (emails.length > 0) {
           lastEmailId = emails[emails.length - 1].id;
         }
-        
+
         // Stop if no more today's emails found on this page (optimization)
         // Since emails are ordered by date (newest first), if we find no emails from today
         // on a page, all subsequent pages will be older
         if (todaysEmails.length === 0) {
-          this.logger.log('⏹️ No emails from today on this page, stopping pagination');
+          this.logger.log(
+            '⏹️ No emails from today on this page, stopping pagination',
+          );
           break;
         }
-        
+
         // If all emails on this page are from today AND we have 100 emails, continue
         // Otherwise if we got fewer emails from today, we're at the boundary - stop
         if (emails.length === 100 && todaysEmails.length === emails.length) {
@@ -121,7 +128,9 @@ export class ResendProviderService implements OnModuleInit {
           continue;
         } else if (todaysEmails.length < emails.length) {
           // Mixed page (today + older), stop here
-          this.logger.log('⏹️ Reached end of today\'s emails (mixed page), stopping pagination');
+          this.logger.log(
+            "⏹️ Reached end of today's emails (mixed page), stopping pagination",
+          );
           break;
         } else if (emails.length < 100) {
           // This is the last page of results
@@ -129,28 +138,30 @@ export class ResendProviderService implements OnModuleInit {
           break;
         }
       }
-      
-      this.logger.log(`📧 Total emails sent today: ${totalCount} (${pageCount} pages fetched)`);
-      
+
+      this.logger.log(
+        `📧 Total emails sent today: ${totalCount} (${pageCount} pages fetched)`,
+      );
+
       // Update cache
       this.emailCountToday = totalCount;
       this.lastApiFetchTime = now;
-      
+
       return totalCount;
     } catch (error: any) {
       this.logger.error(
-        `⚠️ Failed to fetch email count from Resend API: ${error.message}`
+        `⚠️ Failed to fetch email count from Resend API: ${error.message}`,
       );
-      
+
       if (error.response) {
         this.logger.error(
           `API Error: Status ${error.response.status}, ` +
-          `Data: ${JSON.stringify(error.response.data)}`
+            `Data: ${JSON.stringify(error.response.data)}`,
         );
       }
-      
+
       this.logger.log(`Using last known count: ${this.emailCountToday}`);
-      
+
       // Return last known count (don't reset to 0 on error)
       return this.emailCountToday;
     }
@@ -174,13 +185,19 @@ export class ResendProviderService implements OnModuleInit {
 
     // Determine which key should be active
     const shouldUseKey2 = this.emailCountToday >= this.dailyLimit;
-    const currentKey = this.resend ? (this.from.includes('mail.fotosfolio.com') ? 2 : 1) : 0;
+    const currentKey = this.resend
+      ? this.from.includes('mail.fotosfolio.com')
+        ? 2
+        : 1
+      : 0;
     const targetKey = shouldUseKey2 ? 2 : 1;
 
     // Only re-create client if key needs to change
     if (currentKey !== targetKey) {
       if (shouldUseKey2) {
-        this.logger.log(`🔄 Switching to API Key 2 (count: ${this.emailCountToday})`);
+        this.logger.log(
+          `🔄 Switching to API Key 2 (count: ${this.emailCountToday})`,
+        );
         this.resend = new Resend(this.apiKey2);
         this.from = 'Fotosfolio <no-reply@mail.fotosfolio.com>';
       } else {
@@ -221,8 +238,10 @@ export class ResendProviderService implements OnModuleInit {
    */
   incrementCounter(): void {
     this.emailCountToday++;
-    this.logger.debug(`📈 Email counter (local): ${this.emailCountToday}/${this.dailyLimit}`);
-    
+    this.logger.debug(
+      `📈 Email counter (local): ${this.emailCountToday}/${this.dailyLimit}`,
+    );
+
     // Auto-switch if we hit the limit
     if (this.emailCountToday === this.dailyLimit) {
       this.logger.warn('⚠️ Daily limit reached on key 1, switching to key 2');

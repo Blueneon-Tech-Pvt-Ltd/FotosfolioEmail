@@ -4,7 +4,6 @@ import { BaseEmailService, EmailData } from './base-email.service';
 
 @Injectable()
 export class ProjectEmailsService extends BaseEmailService {
-
   async buildProjectTransferEmail(
     receiverEmail: string,
     receiverName: string,
@@ -12,7 +11,7 @@ export class ProjectEmailsService extends BaseEmailService {
     projectName: string,
     projectLink: string,
     totalFiles: number,
-    totalSize: string
+    totalSize: string,
   ): Promise<EmailData> {
     console.log(`Sending project transfer email to ${receiverEmail}`);
     const subject = 'Project Transfer Request – Action Required';
@@ -146,7 +145,7 @@ The Fotosfolio Team
     requesterEmail: string,
     ownerEmail: string,
     photographerName: string,
-    projectId: string
+    projectId: string,
   ): Promise<EmailData> {
     const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Kathmandu',
@@ -263,7 +262,7 @@ The Fotosfolio Team
     requesterEmail: string,
     ownerEmail: string,
     photographerName: string,
-    projectId: string
+    projectId: string,
   ): Promise<EmailData> {
     const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Kathmandu',
@@ -489,8 +488,6 @@ The Fotosfolio Team
         </div>
       </div>
       `,
-    }
+    };
   }
 }
-
-

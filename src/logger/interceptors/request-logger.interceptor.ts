@@ -8,7 +8,6 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { AppLoggerService } from '../logger.service';
 
-
 @Injectable()
 export class RequestLoggerInterceptor implements NestInterceptor {
   constructor(private readonly logger: AppLoggerService) {}
@@ -44,13 +43,13 @@ export class RequestLoggerInterceptor implements NestInterceptor {
     if (!body) return body;
     const sanitized = { ...body };
     const sensitiveFields = ['password', 'token', 'apiKey', 'secret'];
-    
-    sensitiveFields.forEach(field => {
+
+    sensitiveFields.forEach((field) => {
       if (sanitized[field]) {
         sanitized[field] = '***REDACTED***';
       }
     });
-    
+
     return sanitized;
   }
 }

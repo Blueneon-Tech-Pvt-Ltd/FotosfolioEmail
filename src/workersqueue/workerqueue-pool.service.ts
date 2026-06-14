@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker, Job } from 'bullmq';
 import { EmailSenderService } from '../sender/email-sender.service';
@@ -29,7 +34,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     this.logger.log('🚀 Initializing BullMQ worker pools...');
-    
+
     const connection = {
       host: this.configService.get('redis.host'),
       port: this.configService.get('redis.port'),
@@ -48,7 +53,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
     for (const category of categories) {
       const queueName = `${category}-emails`;
-      
+
       // Create queue
       const queue = new Queue(queueName, { connection });
       this.queues.set(category, queue);
@@ -65,7 +70,9 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
       // Worker event listeners
       worker.on('completed', (job) => {
-        this.logger.log(`✅ [${category}] Job ${job.id} completed successfully`);
+        this.logger.log(
+          `✅ [${category}] Job ${job.id} completed successfully`,
+        );
       });
 
       worker.on('failed', (job, err) => {
@@ -99,7 +106,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
    */
   private async processJob(category: EmailCategory, job: Job): Promise<void> {
     const { type, payload } = job.data;
-    
+
     this.logger.log(
       `📧 Processing ${type} email (Job ID: ${job.id}, Attempt: ${job.attemptsMade + 1})`,
     );
@@ -110,22 +117,22 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
       switch (category) {
         case EmailCategory.ACCOUNT:
-          emailData = await this.buildAccountEmail(type, payload) as EmailData;
+          emailData = await this.buildAccountEmail(type, payload);
           break;
         case EmailCategory.SUBSCRIPTION:
-          emailData = await this.buildSubscriptionEmail(type, payload) as EmailData;
+          emailData = await this.buildSubscriptionEmail(type, payload);
           break;
         case EmailCategory.SECURITY:
-          emailData = await this.buildSecurityEmail(type, payload) as EmailData;
+          emailData = await this.buildSecurityEmail(type, payload);
           break;
         case EmailCategory.PROJECT:
-          emailData = await this.buildProjectEmail(type, payload) as EmailData;
+          emailData = await this.buildProjectEmail(type, payload);
           break;
         case EmailCategory.PAYMENT:
-          emailData = await this.buildPaymentEmail(type, payload) as EmailData;
+          emailData = await this.buildPaymentEmail(type, payload);
           break;
         case EmailCategory.STORAGE:
-          emailData = await this.buildStorageEmail(type, payload) as EmailData;
+          emailData = await this.buildStorageEmail(type, payload);
           break;
         default:
           throw new Error(`Unknown email category: ${category}`);
@@ -141,7 +148,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
       // Send the email
       await this.emailSender.sendEmail(emailData);
-      
+
       this.logger.log(`✓ Successfully processed ${type} for ${emailData.to}`);
     } catch (error: any) {
       this.logger.error(
@@ -155,38 +162,61 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build account-related emails
    */
-  private async buildAccountEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildAccountEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.ACCOUNT_CREATED:
-        return this.accountEmails.buildAccountCreatedEmail(payload.to, payload.username);
+        return this.accountEmails.buildAccountCreatedEmail(
+          payload.to,
+          payload.username,
+        );
       case EmailType.PASSWORD_RESET:
-        return this.accountEmails.buildPasswordResetEmail(payload.to, payload.username, payload.resetLink);
+        return this.accountEmails.buildPasswordResetEmail(
+          payload.to,
+          payload.username,
+          payload.resetLink,
+        );
       case EmailType.EMAIL_VERIFICATION:
-        return this.accountEmails.buildOtpEmail(payload.to, payload.userName, payload.otpCode);
+        return this.accountEmails.buildOtpEmail(
+          payload.to,
+          payload.userName,
+          payload.otpCode,
+        );
       case EmailType.PASSWORD_CHANGED:
-        return this.accountEmails.buildPasswordResetSuccessEmail(payload.to, payload.username);
+        return this.accountEmails.buildPasswordResetSuccessEmail(
+          payload.to,
+          payload.username,
+        );
       case EmailType.KYC_APPROVED:
         return this.accountEmails.buildKycApprovedEmail(
           payload.to,
-          payload.userName || payload.username
+          payload.userName || payload.username,
         );
       case EmailType.KYC_REJECTED:
         return this.accountEmails.buildKycRejectedEmail(
           payload.to,
           payload.userName || payload.username,
-          payload.reason
+          payload.reason,
         );
       case EmailType.EMAIL_CHANGED:
         // Map to OTP verified as a placeholder
-        return this.accountEmails.buildOtpVerifiedEmail(payload.to, payload.userName);
+        return this.accountEmails.buildOtpVerifiedEmail(
+          payload.to,
+          payload.userName,
+        );
       case EmailType.ACCOUNT_DELETED:
         // Fallback to account created (inverse logic)
-        return this.accountEmails.buildAccountCreatedEmail(payload.to, payload.username);
+        return this.accountEmails.buildAccountCreatedEmail(
+          payload.to,
+          payload.username,
+        );
       case EmailType.ACCOUNT_ACTIVATION:
         return this.subscriptionEmails.buildAccountActivationEmail(
           payload.to,
           payload.userName,
-          payload.planName
+          payload.planName,
         );
       case EmailType.TWO_FACTOR_ENABLED:
         return this.securityEmails.build2FAEnabledEmail(
@@ -194,15 +224,19 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.TWO_FACTOR_CODE:
-        return this.accountEmails.buildOtpEmail(payload.to, payload.userName, payload.otpCode);
+        return this.accountEmails.buildOtpEmail(
+          payload.to,
+          payload.userName,
+          payload.otpCode,
+        );
       case EmailType.CONTACT_FORM:
         // Contact form uses a special DTO structure
         return this.accountEmails.buildAccountCreatedEmail(
           payload.contact?.email || payload.to,
-          payload.contact?.name || 'User'
+          payload.contact?.name || 'User',
         );
       default:
         throw new Error(`Unknown account email type: ${type}`);
@@ -212,7 +246,10 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build subscription-related emails
    */
-  private async buildSubscriptionEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildSubscriptionEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.SUBSCRIPTION_STARTED:
         return this.subscriptionEmails.buildSubscriptionCreatedEmail(
@@ -221,7 +258,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.planName,
           payload.startDate,
           payload.endDate,
-          payload.status
+          payload.status,
         );
       case EmailType.SUBSCRIPTION_RENEWED:
         return this.subscriptionEmails.buildSubscriptionRenewedEmail(
@@ -230,33 +267,33 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.planName,
           payload.startDate,
           payload.endDate,
-          payload.status
+          payload.status,
         );
       case EmailType.SUBSCRIPTION_CANCELLED:
         // Map to subscription expired
         return this.subscriptionEmails.buildSubscriptionExpiredEmail(
           payload.to,
           payload.userName,
-          payload.graceDaysRemaining 
+          payload.graceDaysRemaining,
         );
       case EmailType.SUBSCRIPTION_EXPIRING:
         return this.subscriptionEmails.buildSubscriptionExpirationReminderEmail(
           payload.to,
           payload.userName,
-          payload.daysRemaining || payload.daysLeft 
+          payload.daysRemaining || payload.daysLeft,
         );
       case EmailType.SUBSCRIPTION_EXPIRED:
         return this.subscriptionEmails.buildSubscriptionExpiredEmail(
           payload.to,
           payload.userName,
-          payload.graceDaysRemaining || 3
+          payload.graceDaysRemaining || 3,
         );
       case EmailType.PLAN_UPGRADED:
         // Map to account activation
         return this.subscriptionEmails.buildAccountActivationEmail(
           payload.to,
           payload.userName,
-          payload.planName
+          payload.planName,
         );
       case EmailType.PLAN_DOWNGRADED:
         // Map to subscription created
@@ -266,7 +303,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.planName,
           payload.startDate,
           payload.endDate,
-          payload.status
+          payload.status,
         );
       default:
         throw new Error(`Unknown subscription email type: ${type}`);
@@ -276,7 +313,10 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build security-related emails
    */
-  private async buildSecurityEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildSecurityEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.LOGIN_ALERT:
         return this.securityEmails.buildNewIpLoginAlertEmail(
@@ -284,7 +324,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.ipAddress,
           payload.device,
           payload.location,
-          payload.datetime
+          payload.datetime,
         );
       case EmailType.NEW_IP_LOGIN:
         return this.securityEmails.buildNewIpLoginAlertEmail(
@@ -292,14 +332,14 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.ipAddress,
           payload.device,
           payload.location,
-          payload.datetime
+          payload.datetime,
         );
       case EmailType.SUSPICIOUS_ACTIVITY:
         return this.securityEmails.buildLoginNotificationEmail(
           payload.to,
           payload.userName,
           payload.loginTime,
-          payload.ipAddress
+          payload.ipAddress,
         );
       case EmailType.GOOGLE_ACCOUNT_DISCONNECTED:
         return this.accountEmails.buildGoogleAccountDisconnectedEmail(
@@ -308,7 +348,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.TWO_FA_DISABLED:
         return this.securityEmails.build2FADisabledEmail(
@@ -316,7 +356,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.PASSKEY_ENABLED:
         return this.securityEmails.buildPasskeyEnabledEmail(
@@ -325,7 +365,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.PASSKEY_DISABLED:
         return this.securityEmails.buildPasskeyDisabledEmail(
@@ -334,7 +374,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.SECURITY_QUESTION_ENABLED:
         return this.securityEmails.buildSecurityQuestionEnabledEmail(
@@ -342,7 +382,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       case EmailType.SECURITY_QUESTION_DISABLED:
         return this.securityEmails.buildSecurityQuestionDisabledEmail(
@@ -350,7 +390,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.device || 'Unknown Device',
           payload.location || 'Unknown Location',
           payload.ipAddress || 'Unknown IP',
-          payload.datetime || new Date()
+          payload.datetime || new Date(),
         );
       default:
         throw new Error(`Unknown security email type: ${type}`);
@@ -360,7 +400,10 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build project-related emails
    */
-  private async buildProjectEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildProjectEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.PROJECT_SHARED:
         return this.projectEmails.buildProjectTransferEmail(
@@ -370,7 +413,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.projectName,
           payload.projectLink,
           payload.totalFiles,
-          payload.totalSize
+          payload.totalSize,
         );
       case EmailType.GALLERY_SHARED:
         // Map to project invitation
@@ -378,7 +421,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.projectName,
           payload.inviterName,
           payload.receiverEmail,
-          payload.projectLink
+          payload.projectLink,
         );
       case EmailType.FOLDER_SHARED:
         // Map to access request
@@ -387,7 +430,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.requesterEmail,
           payload.ownerEmail,
           payload.photographerName || payload.requesterName,
-          payload.projectId
+          payload.projectId,
         );
       case EmailType.FAVOURITE_ACCESS_REQUEST:
         return this.projectEmails.buildFavouriteAccessRequestEmail(
@@ -395,7 +438,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
           payload.requesterEmail,
           payload.ownerEmail,
           payload.photographerName,
-          payload.projectId
+          payload.projectId,
         );
       default:
         throw new Error(`Unknown project email type: ${type}`);
@@ -405,14 +448,21 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build payment-related emails
    */
-  private async buildPaymentEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildPaymentEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.PAYMENT_SUCCESS:
         return this.paymentEmails.buildPaymentSuccess(payload);
       case EmailType.PAYMENT_FAILED:
         return this.paymentEmails.buildPaymentFailed(payload);
       case EmailType.PAYMENT_REJECTION:
-        return this.paymentEmails.buildPaymentRejectionEmail(payload.to, payload.userName, payload.planName);
+        return this.paymentEmails.buildPaymentRejectionEmail(
+          payload.to,
+          payload.userName,
+          payload.planName,
+        );
       case EmailType.REFUND_PROCESSED:
         return this.paymentEmails.buildRefundProcessed(payload);
       default:
@@ -423,7 +473,10 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
   /**
    * Build storage-related emails
    */
-  private async buildStorageEmail(type: EmailType, payload: any): Promise<EmailData> {
+  private async buildStorageEmail(
+    type: EmailType,
+    payload: any,
+  ): Promise<EmailData> {
     switch (type) {
       case EmailType.STORAGE_WARNING:
         return this.storageEmails.buildStorageWarning(payload);
@@ -481,14 +534,15 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
-        queue.getWaitingCount(),
-        queue.getActiveCount(),
-        queue.getCompletedCount(),
-        queue.getFailedCount(),
-        queue.getDelayedCount(),
-        queue.isPaused(),
-      ]);
+      const [waiting, active, completed, failed, delayed, paused] =
+        await Promise.all([
+          queue.getWaitingCount(),
+          queue.getActiveCount(),
+          queue.getCompletedCount(),
+          queue.getFailedCount(),
+          queue.getDelayedCount(),
+          queue.isPaused(),
+        ]);
 
       return {
         waiting,
@@ -499,7 +553,9 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
         paused,
       };
     } catch (error: any) {
-      this.logger.error(`Failed to get stats for ${category}: ${error.message}`);
+      this.logger.error(
+        `Failed to get stats for ${category}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -557,7 +613,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
 
     await queue.clean(grace, 100, 'completed');
     await queue.clean(grace, 100, 'failed');
-    
+
     this.logger.log(`🧹 Cleaned ${category} queue (grace: ${grace}ms)`);
   }
 
@@ -578,7 +634,7 @@ export class WorkerPoolService implements OnModuleInit, OnModuleDestroy {
    */
   async onModuleDestroy() {
     this.logger.log('🛑 Shutting down worker pools...');
-    
+
     try {
       // Close all workers first
       await Promise.all(this.workers.map((worker) => worker.close()));

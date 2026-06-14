@@ -7,7 +7,12 @@ import { VideoS3Service } from './video.s3.service';
 
 @Module({
   imports: [ConfigModule],
-  providers: [VideoProcessQueue, VideoProcessWorker, VideoProcessor, VideoS3Service],
+  providers: [
+    VideoProcessQueue,
+    VideoProcessWorker,
+    VideoProcessor,
+    VideoS3Service,
+  ],
   exports: [VideoProcessQueue],
 })
 export class VideoQueueModule {}

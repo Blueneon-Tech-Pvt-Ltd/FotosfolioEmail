@@ -11,7 +11,7 @@ export class BaseEmailService {
   protected withMetadata(
     emailData: Omit<EmailData, 'category' | 'type'>,
     category: EmailCategory,
-    type: EmailType
+    type: EmailType,
   ): EmailData {
     return {
       ...emailData,
